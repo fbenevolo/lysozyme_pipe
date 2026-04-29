@@ -369,7 +369,7 @@ class BatchProcessor:
         
         for idx, (genome_id, genome_path) in enumerate(genomes, start=1):
             df_result = self.process_single_genome(
-                genome_id, 
+                genome_id,
                 genome_path,
                 genome_num=idx,
                 total_genomes=total_genomes

@@ -320,3 +320,7 @@ def verify_and_install_dependencies() -> dict:
     logger.info(f"Dependencies verified ({num_threads} threads available)")
     
     return dependencies
+
+
+if __name__ == '__main__':
+    verify_and_install_dependencies()

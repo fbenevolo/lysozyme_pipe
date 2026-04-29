@@ -593,7 +593,7 @@ def annotate_pseudogenes(
         # Check start: if alignment has Methionine at beginning (any qstart), start codon exists
         first_qseq_clean = first_hsp.qseq.lstrip('-')
         has_start_in_alignment = (
-            len(first_qseq_clean) > 0 and 
+            len(first_qseq_clean) > 0 and
             first_qseq_clean[0] == 'M'
             # Note: qstart position doesn't matter - divergent N-terminals are normal
         )
@@ -777,7 +777,7 @@ def save_coverage_statistics(
     import pandas as pd
     
     logger.debug(f"Saving coverage statistics to: {output_path}")
-    
+
     coverage_data = []
     for ann in annotations:
         hsps = ann.region_annotation.best_protein.hsps

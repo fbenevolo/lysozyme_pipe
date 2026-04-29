@@ -60,3 +60,8 @@ tmp/
 temp/
 *.tmp
 temp_nonpath.csv
+
+# Nextflow files
+.nextflow/
+work/
+.nextflow*

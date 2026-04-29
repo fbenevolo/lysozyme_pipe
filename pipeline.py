@@ -31,6 +31,7 @@ from src.pseudogene_detection import (
     generate_summary_report
 )
 from src.export_gff3 import export_to_gff3
+from src.filter_ssearch import filter_ssearch_by_evalue
 
 
 def setup_logging(log_file: Path = None, verbose: bool = False) -> None:
@@ -267,17 +268,18 @@ def run_pipeline(
         min_score,
         genome_id=genome_id
     )
-    
+
     if not filtered_hits:
         logger.error("No hits passed filtering")
         return
+
     
     # STEP 3: SSEARCH realignment (silent)
     ssearch_dir = output_dir / "ssearch"
-    ssearch_dir.mkdir(parents=True, exist_ok=True)
-    
+    # ssearch_dir.mkdir(parents=True, exist_ok=True)
+
     from src.ssearch_realign import realign_filtered_hits_parallel
-    
+
     ssearch_alignments = realign_filtered_hits_parallel(
         filtered_hits=filtered_hits,
         query_fasta_path=lysozyme_fasta,
@@ -286,25 +288,23 @@ def run_pipeline(
         ssearch_path=deps['ssearch36'],
         num_threads=num_threads
     )
-    
+
+    # Filter realignments by E-value
+    ssearch_output = ssearch_dir / "ssearch_realignments_filtered_by_evalue.tsv"
+    filtered_ssearch = filter_ssearch_by_evalue(ssearch_alignments, ssearch_output)
+
     logger.debug(f"SSEARCH realignments complete: {len(ssearch_alignments)}")
     
-    # Filter realignments by E-value
-    evalue_threshold = 1e-7
-    filtered_ssearch = {key: aln for key, aln in ssearch_alignments.items() 
-                       if aln.evalue <= evalue_threshold}
-    
-    logger.debug(f"Filtering SSEARCH by E-value <= {evalue_threshold:.0e}")
     logger.debug(f"  - Before filtering: {len(ssearch_alignments)} realignments")
     logger.debug(f"  - After filtering: {len(filtered_ssearch)} realignments")
     
     # Save SSEARCH results
-    ssearch_output = ssearch_dir / "ssearch_realignments.tsv"
-    with open(ssearch_output, 'w') as f:
-        f.write("hit_key\tquery_id\tsubject_id\tidentity\tevalue\tbit_score\n")
-        for key, aln in filtered_ssearch.items():
-            f.write(f"{key}\t{aln.query_id}\t{aln.subject_id}\t"
-                   f"{aln.identity:.2f}\t{aln.evalue:.2e}\t{aln.bit_score:.2f}\n")
+    # with open(ssearch_output, 'w') as f:
+    #     f.write("hit_key\tquery_id\tsubject_id\tidentity\tevalue\tbit_score\n")
+    #     for key, aln in filtered_ssearch.items():
+    #         f.write(f"{key}\t{aln.query_id}\t{aln.subject_id}\t"
+    #                f"{aln.identity:.2f}\t{aln.evalue:.2e}\t{aln.bit_score:.2f}\n")
+    
     
     # Update filtered hits to use only those that passed SSEARCH
     # AND update their scores with SSEARCH scores
@@ -337,6 +337,7 @@ def run_pipeline(
     logger.debug(f"Updated {len(filtered_hits_after_ssearch)} hits with SSEARCH scores")
     filtered_hits = filtered_hits_after_ssearch
     
+    '''
     # STEP 2: Region merging
     logger.info(f"[2/3] Merging {len(filtered_hits)} regions...")
     merged_regions = merge_blast_hits(
@@ -426,7 +427,7 @@ def run_pipeline(
     
     num_pseudogenes = sum(1 for ann in pseudogene_annotations if ann.is_pseudogene)
     logger.info(f"Complete: {len(pseudogene_annotations)} regions, {num_pseudogenes} pseudogenes")
-
+    '''
 
 def main():
     """Função principal do pipeline."""
@@ -442,14 +443,13 @@ def main():
     try:
         # Verifica dependências
         deps = verify_and_install_dependencies()
-        
         # Decide modo de execução: single genome vs. batch
         if args.input_dir:
             # ========== MODO LOTE ==========
             logger.info("Mode: BATCH (multiple genomes)")
             
             from src.batch_processor import BatchProcessor
-            
+
             processor = BatchProcessor(
                 input_dir=args.input_dir,
                 lysozymes_path=args.lysozymes,
@@ -466,17 +466,15 @@ def main():
             start_time = datetime.now()
             processor.run_batch()
             end_time = datetime.now()
-            
         else:
             # ========== MODO SINGLE GENOME ==========
             logger.info("Mode: SINGLE GENOME")
-            
             # Valida entradas
             validate_inputs(args.genome, args.lysozymes)
             
             # Extrai genome_id do nome do arquivo
             genome_id = args.genome.stem
-            
+
             # Executa pipeline
             start_time = datetime.now()
             
@@ -493,22 +491,20 @@ def main():
                 num_threads=args.num_threads,
                 deps=deps  # Pass deps to avoid re-verification
             )
-            
             end_time = datetime.now()
         
         elapsed = end_time - start_time
         
         logger.debug(f"Total execution time: {elapsed}")
         logger.debug("Pipeline completed successfully!")
-        
-    except Exception as e:
-        logger.error(f"Erro durante execução do pipeline: {e}", exc_info=True)
-        sys.exit(1)
-        
-    except Exception as e:
-        logger.error(f"Erro durante execução do pipeline: {e}", exc_info=True)
-        sys.exit(1)
 
+    except Exception as e:
+        logger.error(f"Erro durante execução do pipeline: {e}", exc_info=True)
+        sys.exit(1)
+        
+    except Exception as e:
+        logger.error(f"Erro durante execução do pipeline: {e}", exc_info=True)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

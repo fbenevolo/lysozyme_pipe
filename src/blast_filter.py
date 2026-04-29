@@ -200,7 +200,7 @@ def filter_blast_hits(
     Returns:
         List of filtered hits
     """
-    logger.debug(f"Filtering {len(hits)} BLAST hits...")
+    logger.info(f"Filtering {len(hits)} BLAST hits...")
     
     filtered_hits = [
         hit for hit in hits
@@ -208,7 +208,7 @@ def filter_blast_hits(
     ]
     
     removed_count = len(hits) - len(filtered_hits)
-    logger.debug(f"Kept: {len(filtered_hits)}, Removed: {removed_count}")
+    logger.info(f"Kept: {len(filtered_hits)}, Removed: {removed_count}")
     
     return filtered_hits
 
@@ -256,7 +256,7 @@ def run_filtering_step(
     """
     # Parse BLAST file with genome_id
     hits = parse_blast_output(blast_output_path, genome_id=genome_id)
-    
+
     # Filtering
     filtered_hits = filter_blast_hits(hits, min_identity, min_score)
     
@@ -264,3 +264,8 @@ def run_filtering_step(
     save_filtered_hits(filtered_hits, filtered_output_path)
     
     return filtered_hits
+
+
+import sys
+if __name__ == '__main__':
+    run_filtering_step(Path(sys.argv[1]), Path(sys.argv[2]))

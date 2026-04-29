@@ -27,7 +27,7 @@ SSEARCH_EVALUE_THRESHOLD: float = 1e-6  # 10e-7 from specification
 @dataclass
 class BlastParameters:
     """Parâmetros para execução do tblastn."""
-    
+
     word_size: int = 3
     gapopen: int = 11
     gapextend: int = 1
@@ -40,10 +40,10 @@ class BlastParameters:
     max_target_seqs: int = 1000000
     threshold: int = 13
     num_threads: int = 1  # Será configurado pelo módulo de dependências
-    
+
     # Formato de saída customizado
     outfmt_fields: List[str] = None
-    
+
     def __post_init__(self):
         if self.outfmt_fields is None:
             self.outfmt_fields = [
