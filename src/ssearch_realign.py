@@ -413,7 +413,6 @@ def realign_filtered_hits_parallel(
 
     realignments_output = output_dir / "ssearch_realignments.tsv"
     with open(realignments_output, 'w') as f:
-
         f.write("hit_key\tquery_id\tsubject_id\tidentity\talignment_length\tmismatches\tgap_opens\tquery_start\tquery_end\tsubject_start\tsubject_end\tevalue\tbit_score\traw_score\tquery_seq\tsubject_seq\n")
         for key, aln in realignments.items():
             f.write(f"{key}\t{aln.query_id}\t{aln.subject_id}\t{aln.identity:.2f}\t"
@@ -421,6 +420,7 @@ def realign_filtered_hits_parallel(
                     f"{aln.query_start}\t{aln.query_end}\t{aln.subject_start}\t"
                     f"{aln.subject_end}\t{aln.evalue:.2e}\t{aln.bit_score:.2f}\t"
                     f"{aln.raw_score}\t{aln.query_seq}\t{aln.subject_seq}\n")
+        
         # for key, aln in realignments.items():
         #     f.write(f"{key}\t{aln.query_id}\t{aln.subject_id}\t"
         #            f"{aln.identity:.2f}\t{aln.evalue:.2e}\t{aln.bit_score:.2f}\n")

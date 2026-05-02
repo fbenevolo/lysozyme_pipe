@@ -32,6 +32,7 @@ from src.pseudogene_detection import (
 )
 from src.export_gff3 import export_to_gff3
 from src.filter_ssearch import filter_ssearch_by_evalue
+from src.filter_hits_after_ssearch import filter_hits_after_ssearch
 
 
 def setup_logging(log_file: Path = None, verbose: bool = False) -> None:
@@ -298,38 +299,13 @@ def run_pipeline(
     logger.debug(f"  - Before filtering: {len(ssearch_alignments)} realignments")
     logger.debug(f"  - After filtering: {len(filtered_ssearch)} realignments")
     
-    # Save SSEARCH results
-    # with open(ssearch_output, 'w') as f:
-    #     f.write("hit_key\tquery_id\tsubject_id\tidentity\tevalue\tbit_score\n")
-    #     for key, aln in filtered_ssearch.items():
-    #         f.write(f"{key}\t{aln.query_id}\t{aln.subject_id}\t"
-    #                f"{aln.identity:.2f}\t{aln.evalue:.2e}\t{aln.bit_score:.2f}\n")
-    
-    
-    # Update filtered hits to use only those that passed SSEARCH
-    # AND update their scores with SSEARCH scores
     ssearch_hit_keys = set(filtered_ssearch.keys())
     filtered_hits_after_ssearch = []
-    
-    for hit in filtered_hits:
-        hit_key = f"{hit.qseqid}_{hit.sseqid}_{hit.sstart}_{hit.send}"
-        if hit_key in ssearch_hit_keys:
-            # Update BlastHit with SSEARCH scores
-            ssearch_aln = filtered_ssearch[hit_key]
-            
-            # Update scores (critical for score density calculation)
-            hit.score = int(ssearch_aln.bit_score)  # Use SSEARCH bit score as raw score
-            hit.bitscore = ssearch_aln.bit_score
-            hit.evalue = ssearch_aln.evalue
-            
-            # Update alignment details
-            hit.length = ssearch_aln.alignment_length
-            hit.pident = ssearch_aln.identity
-            hit.mismatch = ssearch_aln.mismatches
-            hit.gapopen = ssearch_aln.gap_opens
-            
-            filtered_hits_after_ssearch.append(hit)
-    
+
+    # Update filtered hits to use only those that passed SSEARCH
+    # AND update their scores with SSEARCH scores
+    filtered_hits_after_ssearch_output = ssearch_dir / "filtered_hits_after_ssearch.tsv"
+    filtered_hits_after_ssearch = filter_hits_after_ssearch(filtered_hits, filtered_ssearch, ssearch_hit_keys, filtered_hits_after_ssearch_output)
     if not filtered_hits_after_ssearch:
         logger.error("No hits passed SSEARCH filtering")
         return
@@ -337,7 +313,6 @@ def run_pipeline(
     logger.debug(f"Updated {len(filtered_hits_after_ssearch)} hits with SSEARCH scores")
     filtered_hits = filtered_hits_after_ssearch
     
-    '''
     # STEP 2: Region merging
     logger.info(f"[2/3] Merging {len(filtered_hits)} regions...")
     merged_regions = merge_blast_hits(
@@ -348,6 +323,7 @@ def run_pipeline(
         genome_id=genome_id
     )
     
+    '''
     merged_output = merge_dir / "merged_regions.tsv"
     save_merged_regions(merged_regions, merged_output)
     

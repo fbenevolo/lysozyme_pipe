@@ -287,3 +287,10 @@ def save_merged_regions(regions: List[GenomicRegion], output_path: Path) -> None
     df.to_csv(output_path, sep='\t', index=False)
     
     logger.debug("Merged regions saved successfully")
+    
+
+import sys
+from src.ssearch_realign import load_hits_from_tsv
+if __name__ == "__main__":
+    blast_hits = load_hits_from_tsv(sys.argv[1])
+    merge_blast_hits(blast_hits, Path(sys.argv[2]))

@@ -16,10 +16,23 @@ def filter_ssearch_by_evalue(ssearch_alignments: dict[str, SSearchAlignment],
                        if aln.evalue <= evalue_threshold}
     
     with open(ssearch_output, 'w') as f:
-        f.write("hit_key\tquery_id\tsubject_id\tidentity\tevalue\tbit_score\n")
+        # f.write("hit_key\tquery_id\tsubject_id\tidentity\tevalue\tbit_score\n")
+
+        f.write("hit_key\tquery_id\tsubject_id\tidentity\talignment_length\tmismatches\tgap_opens\t"
+                "query_start\tquery_end\tsubject_start\tsubject_end\tevalue\tbit_score\t"
+                "raw_score\tquery_seq\tsubject_seq\n")
+        
         for key, aln in filtered_ssearch.items():
-            f.write(f"{key}\t{aln.query_id}\t{aln.subject_id}\t"
-                   f"{aln.identity:.2f}\t{aln.evalue:.2e}\t{aln.bit_score:.2f}\n")
+            f.write(f"{key}\t{aln.query_id}\t{aln.subject_id}\t{aln.identity:.2f}\t"
+                    f"{aln.alignment_length}\t{aln.mismatches}\t{aln.gap_opens}\t"
+                    f"{aln.query_start}\t{aln.query_end}\t{aln.subject_start}\t"
+                    f"{aln.subject_end}\t{aln.evalue:.2e}\t{aln.bit_score:.2f}\t"
+                    f"{aln.raw_score}\t{aln.query_seq}\t{aln.subject_seq}\n")
+
+        # f.write("hit_key\tquery_id\tsubject_id\tidentity\tevalue\tbit_score\n")
+        # for key, aln in filtered_ssearch.items():
+        #     f.write(f"{key}\t{aln.query_id}\t{aln.subject_id}\t"
+        #            f"{aln.identity:.2f}\t{aln.evalue:.2e}\t{aln.bit_score:.2f}\n")
     
     return filtered_ssearch
 
