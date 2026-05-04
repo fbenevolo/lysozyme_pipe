@@ -22,7 +22,7 @@ from src.dependencies import verify_and_install_dependencies
 from src.blast_search import run_blast_pipeline_step
 from src.blast_filter import run_filtering_step
 from src.ssearch_realign import realign_filtered_hits
-from src.bedtools_merge import merge_blast_hits, save_merged_regions
+from src.bedtools_merge import merge_blast_hits
 from src.score_density import annotate_regions_with_best_proteins, save_region_annotations
 from src.pseudogene_detection import (
     annotate_pseudogenes,
@@ -33,6 +33,7 @@ from src.pseudogene_detection import (
 from src.export_gff3 import export_to_gff3
 from src.filter_ssearch import filter_ssearch_by_evalue
 from src.filter_hits_after_ssearch import filter_hits_after_ssearch
+from src.bedtools_save_merged_regions import save_merged_regions
 
 
 def setup_logging(log_file: Path = None, verbose: bool = False) -> None:
@@ -323,10 +324,11 @@ def run_pipeline(
         genome_id=genome_id
     )
     
-    '''
+    
     merged_output = merge_dir / "merged_regions.tsv"
     save_merged_regions(merged_regions, merged_output)
     
+    '''
     # Score density calculation (silent)
     region_annotations = annotate_regions_with_best_proteins(
         merged_regions,

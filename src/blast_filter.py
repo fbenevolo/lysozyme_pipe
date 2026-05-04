@@ -268,4 +268,4 @@ def run_filtering_step(
 
 import sys
 if __name__ == '__main__':
-    run_filtering_step(Path(sys.argv[1]), Path(sys.argv[2]))
+    run_filtering_step(Path(sys.argv[1]), Path(sys.argv[2]), genome_id=sys.argv[3])

@@ -268,29 +268,13 @@ def merge_blast_hits(
     regions = parse_merged_bed(merged_bed_path, genome_id=genome_id)
     
     return regions
-
-
-def save_merged_regions(regions: List[GenomicRegion], output_path: Path) -> None:
-    """
-    Save merged regions to TSV file.
-    
-    Args:
-        regions: List of genomic regions
-        output_path: Path to output file
-    """
-    logger.debug(f"Saving {len(regions)} merged regions to: {output_path}")
-    
-    data = [region.to_dict() for region in regions]
-    df = pd.DataFrame(data)
-    
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(output_path, sep='\t', index=False)
-    
-    logger.debug("Merged regions saved successfully")
     
 
 import sys
 from src.ssearch_realign import load_hits_from_tsv
 if __name__ == "__main__":
     blast_hits = load_hits_from_tsv(sys.argv[1])
-    merge_blast_hits(blast_hits, Path(sys.argv[2]))
+
+    logger.info(sys.argv[3])
+
+    merge_blast_hits(blast_hits, Path(sys.argv[2]), genome_id=sys.argv[3])

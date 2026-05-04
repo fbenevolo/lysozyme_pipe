@@ -3,11 +3,14 @@ include { RunFilteringStep } from "../modules/local/run_filtering_step.nf";
 include { RealignFilteredHitsParallel } from "../modules/local/realign_filtered_hits_parallel.nf";
 include { FilterSSearchByEValue } from "../modules/local/filter_ssearch_by_evalue.nf";
 include { FilterHitsAfterSSearch } from "../modules/local/filter_hits_after_ssearch.nf";
-include { MergeBlastHits } from "../modules/local/merge_blast_hits.nf"; 
+include { BedtoolsMergeBlastHits } from "../modules/local/bedtools_merge_blast_hits.nf"; 
+include { BedtoolsSaveMergedRegions } from "../modules/local/bedtools_save_merged_regions.nf";
 
 workflow {
     main:
-    
+
+    def genome_id = file(params.genome_fasta).baseName;
+
     log.info "[1/3] Running Blast Search..."
     blast_out = RunBlastPipeline(
         file(params.genome_fasta), 
@@ -16,7 +19,8 @@ workflow {
 
     filtering_step_out = RunFilteringStep(
         blast_out[0],
-        "${params.output_blast}/filtered_hits.tsv"
+        "${params.output_blast}/filtered_hits.tsv",
+        genome_id
     )
 
     filtering_step_out.filter { file -> 
@@ -54,8 +58,15 @@ workflow {
         }
     }
 
-    MergeBlastHits(
+    merge_blast_hits_out = BedtoolsMergeBlastHits(
         filtered_hits_after_ssearch_out, 
-        "./merge/"
+        "./",
+        genome_id
+    )
+
+    BedtoolsSaveMergedRegions(
+        merge_blast_hits_out[1],
+        "./merged_regions.tsv",
+        genome_id
     )
 }
