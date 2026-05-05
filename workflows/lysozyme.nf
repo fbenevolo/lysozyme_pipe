@@ -5,17 +5,19 @@ include { FilterSSearchByEValue } from "../modules/local/filter_ssearch_by_evalu
 include { FilterHitsAfterSSearch } from "../modules/local/filter_hits_after_ssearch.nf";
 include { BedtoolsMergeBlastHits } from "../modules/local/bedtools_merge_blast_hits.nf"; 
 include { BedtoolsSaveMergedRegions } from "../modules/local/bedtools_save_merged_regions.nf";
+include { AnnotateRegionsWithBestProteins } from "../modules/local/annotate_regions_with_best_proteins.nf";
 
 workflow {
     main:
 
     def genome_id = file(params.genome_fasta).baseName;
 
-    log.info "[1/3] Running Blast Search..."
     blast_out = RunBlastPipeline(
         file(params.genome_fasta), 
         file(params.lysozyme_fasta)
         )
+    
+    log.info "[1/3] Running Blast Search..."
 
     filtering_step_out = RunFilteringStep(
         blast_out[0],
@@ -64,9 +66,14 @@ workflow {
         genome_id
     )
 
-    BedtoolsSaveMergedRegions(
+    merged_regions_out = BedtoolsSaveMergedRegions(
         merge_blast_hits_out[1],
         "./merged_regions.tsv",
         genome_id
+    )
+
+    AnnotateRegionsWithBestProteins(
+        merge_blast_hits_out[1],
+        filtered_hits_after_ssearch_out
     )
 }

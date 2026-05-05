@@ -3,7 +3,9 @@ Module for score density calculation and best hit selection.
 Implements pipeline step 5: Score Density Calculation and Selection.
 """
 
+import pandas as pd
 import logging
+from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
 from collections import defaultdict
@@ -240,14 +242,17 @@ def assign_hsps_to_regions(
 
 def annotate_regions_with_best_proteins(
     regions: List[GenomicRegion],
-    all_hsps: List[BlastHit]
+    all_hsps: List[BlastHit],
+    output_path: Path
 ) -> List[RegionAnnotation]:
     """
-    Annotate each genomic region with the best protein (highest score density).
+    Annotate each genomic region with the best protein (highest score density) 
+    and saves them in a TSV file.
     
     Args:
         regions: List of merged genomic regions
         all_hsps: List of all filtered HSPs
+        output_path: Path to output file
     
     Returns:
         List of region annotations with best proteins
@@ -274,21 +279,6 @@ def annotate_regions_with_best_proteins(
         annotations.append(annotation)
     
     logger.debug(f"{len(annotations)} regions annotated")
-    return annotations
-
-
-def save_region_annotations(
-    annotations: List[RegionAnnotation],
-    output_path
-) -> None:
-    """
-    Save region annotations to TSV file.
-    
-    Args:
-        annotations: List of region annotations
-        output_path: Path to output file
-    """
-    import pandas as pd
     
     logger.debug(f"Saving {len(annotations)} annotations to: {output_path}")
     
@@ -299,3 +289,14 @@ def save_region_annotations(
     df.to_csv(output_path, sep='\t', index=False)
     
     logger.debug("Annotations saved successfully")
+
+    return annotations
+
+
+import sys
+from src.ssearch_realign import load_blast_hits_from_tsv
+from src.bedtools_merge import parse_merged_bed
+if __name__ == '__main__':
+    genomic_region = parse_merged_bed(Path(sys.argv[1]))
+    blast_hits = load_blast_hits_from_tsv(Path(sys.argv[2]))
+    annotate_regions_with_best_proteins(genomic_region, blast_hits, Path(sys.argv[3]))

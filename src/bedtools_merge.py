@@ -197,7 +197,7 @@ def parse_merged_bed(merged_bed_path: Path, genome_id: str = "unknown") -> List[
         merged_bed_path,
         sep='\t',
         header=None,
-        names=['chromosome', 'start', 'end', 'num_hsps', 'mean_score', 
+        names=['chromosome', 'start', 'end', 'num_hsps', 'mean_score',
                'min_score', 'max_score', 'strands']
     )
     
@@ -271,10 +271,7 @@ def merge_blast_hits(
     
 
 import sys
-from src.ssearch_realign import load_hits_from_tsv
+from src.ssearch_realign import load_blast_hits_from_tsv
 if __name__ == "__main__":
-    blast_hits = load_hits_from_tsv(sys.argv[1])
-
-    logger.info(sys.argv[3])
-
+    blast_hits = load_blast_hits_from_tsv(sys.argv[1])
     merge_blast_hits(blast_hits, Path(sys.argv[2]), genome_id=sys.argv[3])

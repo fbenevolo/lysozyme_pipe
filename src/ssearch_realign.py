@@ -431,7 +431,7 @@ def realign_filtered_hits_parallel(
 
 import pandas as pd
 import sys
-def load_hits_from_tsv(tsv_path: Path) -> List[BlastHit]:
+def load_blast_hits_from_tsv(tsv_path: Path) -> List[BlastHit]:
     """
     Args:
         tsv_path: Path to tsv containing hits
@@ -449,5 +449,5 @@ def load_hits_from_tsv(tsv_path: Path) -> List[BlastHit]:
 
 if __name__ == "__main__":
     tsv_file = sys.argv[1]
-    hits = load_hits_from_tsv(tsv_file)
+    hits = load_blast_hits_from_tsv(tsv_file)
     realign_filtered_hits_parallel(hits, Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4]), sys.argv[5])

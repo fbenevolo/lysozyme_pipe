@@ -23,7 +23,7 @@ from src.blast_search import run_blast_pipeline_step
 from src.blast_filter import run_filtering_step
 from src.ssearch_realign import realign_filtered_hits
 from src.bedtools_merge import merge_blast_hits
-from src.score_density import annotate_regions_with_best_proteins, save_region_annotations
+from src.score_density import annotate_regions_with_best_proteins
 from src.pseudogene_detection import (
     annotate_pseudogenes,
     save_pseudogene_annotations,
@@ -328,16 +328,18 @@ def run_pipeline(
     merged_output = merge_dir / "merged_regions.tsv"
     save_merged_regions(merged_regions, merged_output)
     
-    '''
+
     # Score density calculation (silent)
+    annotations_output = final_dir / "region_annotations.tsv"
     region_annotations = annotate_regions_with_best_proteins(
         merged_regions,
-        filtered_hits
+        filtered_hits,
+        annotations_output
     )
     
-    annotations_output = final_dir / "region_annotations.tsv"
-    save_region_annotations(region_annotations, annotations_output)
+    # save_region_annotations(region_annotations, annotations_output)
     
+    '''
     # STEP 3: Pseudogene detection
     logger.info(f"[3/3] Analyzing {len(region_annotations)} regions for pseudogenes...")
     

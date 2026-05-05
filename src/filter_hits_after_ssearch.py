@@ -3,11 +3,25 @@ from typing import List
 from blast_filter import BlastHit
 from ssearch_realign import SSearchAlignment
 
-from src.ssearch_realign import load_hits_from_tsv # convert TSV to List[BlastHit]
+from src.ssearch_realign import load_blast_hits_from_tsv # convert TSV to List[BlastHit]
 from src.filter_ssearch import load_alignments_from_tsv # convert TSV to Dict[str, SSearchAlignment]
 
 def filter_hits_after_ssearch(filtered_hits: List[BlastHit], filtered_ssearch: dict[str, SSearchAlignment],
                               ssearch_hit_keys: List, filtered_hits_after_ssearch_output: Path) -> List[BlastHit]:
+    """
+    TODO generate docstring
+        
+    :param filtered_hits: Description
+    :type filtered_hits: List[BlastHit]
+    :param filtered_ssearch: Description
+    :type filtered_ssearch: dict[str, SSearchAlignment]
+    :param ssearch_hit_keys: Description
+    :type ssearch_hit_keys: List
+    :param filtered_hits_after_ssearch_output: Description
+    :type filtered_hits_after_ssearch_output: Path
+    :return: Description
+    :rtype: List[BlastHit]
+    """
     filtered_hits_after_ssearch = []
     
     for hit in filtered_hits:
@@ -75,7 +89,7 @@ def filter_hits_after_ssearch(filtered_hits: List[BlastHit], filtered_ssearch: d
 
 import sys
 if __name__ == '__main__':
-    blast_hit_list = load_hits_from_tsv(sys.argv[1])
+    blast_hit_list = load_blast_hits_from_tsv(sys.argv[1])
     ssearch_aligment_to_hit = load_alignments_from_tsv(sys.argv[2])
     ssearch_hit_keys = ssearch_aligment_to_hit.keys()
     filter_hits_after_ssearch(blast_hit_list, ssearch_aligment_to_hit, ssearch_hit_keys, sys.argv[3])
