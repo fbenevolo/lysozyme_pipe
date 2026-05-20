@@ -5,6 +5,7 @@ Implementa a etapa 6 do pipeline: Detecção de Mutação e Pseudogenes.
 
 import json
 import logging
+from bedtools_merge import GenomicRegion
 import pandas as pd
 from typing import List, Set, Dict, Optional
 from dataclasses import dataclass
@@ -75,6 +76,51 @@ class PseudogeneAnnotation:
             result['sseq'] = ""
             
         return result
+    
+    def to_json_dict(self) -> Dict:
+        """Serialização completa para JSON — preserva estrutura aninhada."""
+        return {
+            'region_annotation': self.region_annotation.to_dict(),
+            'disablements': self.disablements.to_dict(),
+            'is_pseudogene': self.is_pseudogene,
+            'is_small_orf': self.is_small_orf,
+        }
+    
+    @classmethod
+    def from_dict(cls, d: Dict) -> 'PseudogeneAnnotation':
+        # Reconstrói RegionAnnotation a partir da estrutura plana
+        region = GenomicRegion(
+            genome_id=d['region']['genome_id'],
+            chromosome=d['region']['chromosome'],
+            start=d['region']['start'],
+            end=d['region']['end'],
+            strand=d['region']['strand'],
+            num_hsps=d['region']['num_hsps'],
+            mean_score=d['region']['mean_score'],
+            min_score=d['region']['min_score'],
+            max_score=d['region']['max_score'],
+            query_ids=d['region']['query_ids'].split(',') if isinstance(d['region']['query_ids'], str) else d['region']['query_ids'],
+        )
+        region_annotation = RegionAnnotation(
+            region=region,
+            best_protein=ProteinHitGroup.from_dict(d['best_protein']),
+            all_proteins=[ProteinHitGroup.from_dict(p) for p in d['all_proteins']],
+        )
+        disablements = DisablementCounts(
+            non_synonymous_substitutions=d['non_synonymous_substitutions'],
+            in_frame_indels=d['in_frame_indels'],
+            frameshifts=d['frameshifts'],
+            missing_start_codon=d['missing_start_codon'],
+            missing_stop_codon=d['missing_stop_codon'],
+            premature_stop_codons=d['premature_stop_codons'],
+            size_mismatch=d['size_mismatch'],
+        )
+        return cls(
+            region_annotation=region_annotation,
+            disablements=disablements,
+            is_pseudogene=d['is_pseudogene'],
+            is_small_orf=d.get('is_small_orf', False),
+        )
 
 
 def count_non_synonymous_substitutions(query_seq: str, subject_seq: str) -> int:

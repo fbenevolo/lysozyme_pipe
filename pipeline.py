@@ -30,6 +30,8 @@ from src.pseudogene_detection import (
     save_coverage_statistics,
     generate_summary_report
 )
+from apply_coverage_filter import apply_coverage
+from apply_final_identity_filter import apply_final_identity
 from src.export_gff3 import export_to_gff3
 from src.filter_ssearch import filter_ssearch_by_evalue
 from src.filter_hits_after_ssearch import filter_hits_after_ssearch
@@ -348,28 +350,18 @@ def run_pipeline(
         min_disablements
     )
     
-    '''
     # --- Coverage Filter ---
     if min_coverage > 0:
         logger.info(f"Applying coverage filter: >= {min_coverage*100:.1f}%")
+
         original_count = len(pseudogene_annotations)
-        
-        filtered_annotations = []
-        for ann in pseudogene_annotations:
-            hsps = ann.region_annotation.best_protein.hsps
-            if hsps:
-                min_qstart = min(hsp.qstart for hsp in hsps)
-                max_qend = max(hsp.qend for hsp in hsps)
-                coverage_len = max_qend - min_qstart + 1
-                ref_len = hsps[0].qlen
-                coverage_ratio = coverage_len / ref_len if ref_len > 0 else 0
-                
-                if coverage_ratio >= min_coverage:
-                    filtered_annotations.append(ann)
+        annotations_with_coverage_path = final_dir / "pseudogene_annotations_with_coverage.jsonl"
+        filtered_annotations = apply_coverage(pseudogene_annotations, min_coverage, annotations_with_coverage_path)
         
         pseudogene_annotations = filtered_annotations
         logger.info(f"  Filtered {original_count - len(pseudogene_annotations)} regions. Remaining: {len(pseudogene_annotations)}")
 
+    
     # --- Final Identity Filter ---
     if final_min_identity > 0:
         # Convert fraction to percentage if necessary (e.g. 0.7 -> 70.0)
@@ -378,15 +370,15 @@ def run_pipeline(
         
         logger.info(f"Applying final identity filter: >= {threshold_pct:.1f}%")
         original_count = len(pseudogene_annotations)
-        
-        pseudogene_annotations = [
-            ann for ann in pseudogene_annotations 
-            if max(hsp.pident for hsp in ann.region_annotation.best_protein.hsps) >= threshold_pct
-        ]
+
+        annotations_with_final_identity_path = final_dir / "pseudogene_annotations_with_final_identity.jsonl"
+        filtered_annotations = apply_final_identity(pseudogene_annotations, final_min_identity, annotations_with_final_identity_path)
+        pseudogene_annotations = filtered_annotations
         
         logger.info(f"  Filtered {original_count - len(pseudogene_annotations)} regions. Remaining: {len(pseudogene_annotations)}")
     
-    pseudogenes_output = final_dir / "pseudogene_annotations.tsv"
+    '''
+    pseudogenes_output = final_dir / "pseudogene_annotations_final.tsv"
     save_pseudogene_annotations(pseudogene_annotations, pseudogenes_output)
     
     # Export GFF3

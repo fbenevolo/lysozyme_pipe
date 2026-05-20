@@ -7,6 +7,8 @@ include { BedtoolsMergeBlastHits } from "../modules/local/bedtools_merge_blast_h
 include { BedtoolsSaveMergedRegions } from "../modules/local/bedtools_save_merged_regions.nf";
 include { AnnotateRegionsWithBestProteins } from "../modules/local/annotate_regions_with_best_proteins.nf";
 include { AnnotatePseudogenes } from "../modules/local/annotate_pseudogenes.nf";
+include { ApplyCoverage } from "../modules/local/apply_coverage.nf";
+include { ApplyFinalIdentity } from "../modules/local/apply_final_identity.nf";
 
 workflow {
     main:
@@ -79,9 +81,23 @@ workflow {
         genome_id
     )
 
-    AnnotatePseudogenes(
+    pseudogene_annotation_out = AnnotatePseudogenes(
         annotate_regions_with_best_proteins_out,
         params.genome_fasta,
         params.min_disablements
     )
+    
+    pseudogene_annotation_with_coverage_out = ApplyCoverage(
+        pseudogene_annotation_out,
+        params.min_coverage
+    )
+
+    pseudogene_annotation_parcial = (params.min_coverage > 0) ? pseudogene_annotation_with_coverage_out : pseudogene_annotation_out
+
+    pseudogene_annotation_with_final_identity = ApplyFinalIdentity(
+        pseudogene_annotation_parcial,
+        params.final_min_identity
+    )
+
+    pseudogene_annotation_final = (params.final_min_identity) ? pseudogene_annotation_with_final_identity : pseudogene_annotation_parcial
 }

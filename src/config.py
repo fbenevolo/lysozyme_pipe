@@ -223,6 +223,19 @@ class DisablementCounts:
             "size_mismatch": self.size_mismatch,
             "total_disablements": self.total_disablements
         }
+    
+    @classmethod
+    def from_dict(cls, d: Dict) -> 'DisablementCounts':
+        return cls(
+            non_synonymous_substitutions=d['non_synonymous_substitutions'],
+            in_frame_indels=d['in_frame_indels'],
+            frameshifts=d['frameshifts'],
+            missing_start_codon=d['missing_start_codon'],
+            missing_stop_codon=d['missing_stop_codon'],
+            premature_stop_codons=d['premature_stop_codons'],
+            size_mismatch=d['size_mismatch'],
+            # total_disablements ignorado — é @property calculada automaticamente
+        )
 
 
 # ==================== INSTÂNCIAS PADRÃO ====================

@@ -321,8 +321,6 @@ def annotate_regions_with_best_proteins(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open('w') as f:
         for ann in annotations:
-
-            logger.info(f"{ann}\n\n")
             f.write(json.dumps(ann.to_dict()) + '\n')  # JSON Lines: 1 objeto por linha
 
     logger.debug("Annotations saved successfully in JSONL")
