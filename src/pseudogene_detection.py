@@ -3,7 +3,9 @@ Módulo para detecção de mutações e caracterização de pseudogenes.
 Implementa a etapa 6 do pipeline: Detecção de Mutação e Pseudogenes.
 """
 
+import json
 import logging
+import pandas as pd
 from typing import List, Set, Dict, Optional
 from dataclasses import dataclass
 from pathlib import Path
@@ -555,6 +557,7 @@ def classify_as_pseudogene(
 def annotate_pseudogenes(
     region_annotations: List[RegionAnnotation],
     genome_fasta_path: Path,
+    output_path: Path,
     min_disablements: int = 1,
     padding: int = 150
 ) -> List[PseudogeneAnnotation]:
@@ -568,6 +571,7 @@ def annotate_pseudogenes(
         region_annotations: Lista de anotações de região com melhores proteínas
         genome_fasta_path: Caminho para o arquivo FASTA do genoma
         min_disablements: Número mínimo de mutações para classificar como pseudogene
+        output_path: Caminho para salvar a lista de anotações de pseudogenes 
         padding: Nucleotídeos extras para buscar start/stop (padrão: 150bp)
     
     Returns:
@@ -694,7 +698,20 @@ def annotate_pseudogenes(
     
     num_pseudogenes = sum(1 for ann in pseudogene_annotations if ann.is_pseudogene)
     logger.debug(f"Pseudogenes: {num_pseudogenes}/{len(pseudogene_annotations)}")
-    
+
+    logger.debug(f"Saving {len(pseudogene_annotations)} pseudogene annotations to: {output_path}")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open('w') as f:
+        for ann in pseudogene_annotations:
+            f.write(json.dumps(ann.to_dict()) + '\n')  # JSON Lines: 1 objeto por linha
+
+
+    # data = [ann.to_dict() for ann in pseudogene_annotations]
+    # df = pd.DataFrame(data)
+    # output_path.parent.mkdir(parents=True, exist_ok=True)
+    # df.to_csv(output_path, sep='\t', index=False)
+
     return pseudogene_annotations
 
 
@@ -709,8 +726,6 @@ def save_pseudogene_annotations(
         annotations: Lista de anotações de pseudogenes
         output_path: Caminho para o arquivo de saída
     """
-    import pandas as pd
-    
     logger.debug(f"Saving {len(annotations)} pseudogene annotations to: {output_path}")
     
     data = [ann.to_dict() for ann in annotations]
@@ -998,3 +1013,29 @@ REFERENCE PROTEIN COVERAGE ANALYSIS:
 """
     
     return report
+
+def load_annotations_from_json(annotations_path: Path) -> List[RegionAnnotation]:
+    """
+    Carrega RegionAnnotations de um arquivo JSON Lines.
+
+    Args:
+        annotations_path: Caminho para o arquivo .jsonl gerado por annotate_regions_with_best_proteins
+
+    Returns:
+        Lista de RegionAnnotation completamente reconstruída
+    """
+    annotations = []
+    with annotations_path.open('r') as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                d = json.loads(line)
+                annotations.append(RegionAnnotation.from_dict(d))
+
+    logger.debug(f"Loaded {len(annotations)} region annotations from {annotations_path}")
+    return annotations
+
+import sys
+if __name__ == "__main__":
+    region_annotations = load_annotations_from_json(Path(sys.argv[1]))
+    annotate_pseudogenes(region_annotations, Path(sys.argv[2]), Path(sys.argv[4]), min_disablements=int(sys.argv[3]))

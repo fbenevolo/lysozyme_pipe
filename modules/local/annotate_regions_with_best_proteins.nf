@@ -4,12 +4,13 @@ process AnnotateRegionsWithBestProteins {
     input:
     path genomic_regions_path
     path filtered_hits_path
+    val genome_id
 
     output:
-    path "region_annotations.tsv"
+    path "region_annotations.jsonl"
 
     script:
     """
-    python3 ${workflow.projectDir}/../src/score_density.py ${genomic_regions_path} ${filtered_hits_path} ./region_annotations.tsv 
+    python3 -u ${workflow.projectDir}/../src/score_density.py ${genomic_regions_path} ${filtered_hits_path} ./region_annotations.jsonl ${genome_id}
     """
 }

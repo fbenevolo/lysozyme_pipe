@@ -62,6 +62,25 @@ class ProteinHitGroup:
             total_length=total_length,
             score_density=score_density
         )
+    
+    def to_dict(self) -> Dict:
+        return {
+            'protein_id': self.protein_id,
+            'hsps': [hsp.to_dict() for hsp in self.hsps],
+            'total_score': self.total_score,
+            'total_length': self.total_length,
+            'score_density': self.score_density,
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict) -> 'ProteinHitGroup':
+        return cls(
+            protein_id=d['protein_id'],
+            hsps=[BlastHit.from_dict(h) for h in d['hsps']],
+            total_score=d['total_score'],
+            total_length=d['total_length'],
+            score_density=d['score_density'],
+        )
 
 
 @dataclass
@@ -71,22 +90,39 @@ class RegionAnnotation:
     region: GenomicRegion           # Região genômica fundida
     best_protein: ProteinHitGroup   # Proteína com maior densidade de score
     all_proteins: List[ProteinHitGroup]  # Todas as proteínas que mapearam
-    
+
     def to_dict(self) -> Dict:
-        """Convert annotation to dictionary."""
+        """Serialização completa para JSON."""
         return {
-            'chromosome': self.region.chromosome,
-            'start': self.region.start,
-            'end': self.region.end,
-            'length': self.region.length,
-            'strand': self.region.strand,
-            'best_protein_id': self.best_protein.protein_id,
-            'best_protein_score_density': self.best_protein.score_density,
-            'best_protein_total_score': self.best_protein.total_score,
-            'best_protein_total_length': self.best_protein.total_length,
-            'best_protein_num_hsps': len(self.best_protein.hsps),
-            'num_competing_proteins': len(self.all_proteins)
+            'region': self.region.to_dict(),
+            'best_protein': self.best_protein.to_dict(),
+            'all_proteins': [p.to_dict() for p in self.all_proteins],
         }
+    
+    @classmethod
+    def from_dict(cls, d: Dict) -> 'RegionAnnotation':
+        """Deserializa um RegionAnnotation a partir de um dicionário."""
+        return cls(
+            region=GenomicRegion.from_dict(d['region']),
+            best_protein=ProteinHitGroup.from_dict(d['best_protein']),
+            all_proteins=[ProteinHitGroup.from_dict(p) for p in d['all_proteins']],
+        )
+    
+    # def to_dict(self) -> Dict:
+    #     """Convert annotation to dictionary."""
+    #     return {
+    #         'chromosome': self.region.chromosome,
+    #         'start': self.region.start,
+    #         'end': self.region.end,
+    #         'length': self.region.length,
+    #         'strand': self.region.strand,
+    #         'best_protein_id': self.best_protein.protein_id,
+    #         'best_protein_score_density': self.best_protein.score_density,
+    #         'best_protein_total_score': self.best_protein.total_score,
+    #         'best_protein_total_length': self.best_protein.total_length,
+    #         'best_protein_num_hsps': len(self.best_protein.hsps),
+    #         'num_competing_proteins': len(self.all_proteins)
+    #     }
 
 
 def calculate_score_density(hsps: List[BlastHit]) -> float:
@@ -239,21 +275,21 @@ def assign_hsps_to_regions(
     logger.debug(f"HSPs assigned to {len(region_hsps_map)} regions")
     return dict(region_hsps_map)
 
+import json
 
 def annotate_regions_with_best_proteins(
     regions: List[GenomicRegion],
     all_hsps: List[BlastHit],
-    output_path: Path
+    output_path: Path,
 ) -> List[RegionAnnotation]:
     """
     Annotate each genomic region with the best protein (highest score density) 
-    and saves them in a TSV file.
+    and saves them in a JSON file.
     
     Args:
         regions: List of merged genomic regions
         all_hsps: List of all filtered HSPs
-        output_path: Path to output file
-    
+        output_path: Path to output file in JSON format    
     Returns:
         List of region annotations with best proteins
     """
@@ -281,14 +317,15 @@ def annotate_regions_with_best_proteins(
     logger.debug(f"{len(annotations)} regions annotated")
     
     logger.debug(f"Saving {len(annotations)} annotations to: {output_path}")
-    
-    data = [ann.to_dict() for ann in annotations]
-    df = pd.DataFrame(data)
-    
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(output_path, sep='\t', index=False)
-    
-    logger.debug("Annotations saved successfully")
+    with output_path.open('w') as f:
+        for ann in annotations:
+
+            logger.info(f"{ann}\n\n")
+            f.write(json.dumps(ann.to_dict()) + '\n')  # JSON Lines: 1 objeto por linha
+
+    logger.debug("Annotations saved successfully in JSONL")
 
     return annotations
 
@@ -297,6 +334,6 @@ import sys
 from src.ssearch_realign import load_blast_hits_from_tsv
 from src.bedtools_merge import parse_merged_bed
 if __name__ == '__main__':
-    genomic_region = parse_merged_bed(Path(sys.argv[1]))
+    genomic_region = parse_merged_bed(Path(sys.argv[1]), genome_id=sys.argv[4])
     blast_hits = load_blast_hits_from_tsv(Path(sys.argv[2]))
     annotate_regions_with_best_proteins(genomic_region, blast_hits, Path(sys.argv[3]))

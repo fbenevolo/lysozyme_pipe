@@ -57,6 +57,11 @@ class GenomicRegion:
             'max_score': self.max_score,
             'query_ids': ','.join(self.query_ids) if isinstance(self.query_ids, list) else self.query_ids
         }
+    
+    @classmethod
+    def from_dict(cls, d: Dict) -> 'GenomicRegion':
+        d = {k: v for k, v in d.items() if k != 'length'}
+        return cls(**d)
 
 
 def blast_hits_to_bed(

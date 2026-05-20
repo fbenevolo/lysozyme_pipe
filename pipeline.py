@@ -330,25 +330,25 @@ def run_pipeline(
     
 
     # Score density calculation (silent)
-    annotations_output = final_dir / "region_annotations.tsv"
+    annotations_output = final_dir / "region_annotations.jsonl"
     region_annotations = annotate_regions_with_best_proteins(
         merged_regions,
         filtered_hits,
         annotations_output
     )
-    
-    # save_region_annotations(region_annotations, annotations_output)
-    
-    '''
+
     # STEP 3: Pseudogene detection
     logger.info(f"[3/3] Analyzing {len(region_annotations)} regions for pseudogenes...")
     
+    initial_annotations_path = final_dir / "initial_pseudogene_annotations.jsonl"
     pseudogene_annotations = annotate_pseudogenes(
         region_annotations,
         genome_fasta,
+        initial_annotations_path,
         min_disablements
     )
     
+    '''
     # --- Coverage Filter ---
     if min_coverage > 0:
         logger.info(f"Applying coverage filter: >= {min_coverage*100:.1f}%")

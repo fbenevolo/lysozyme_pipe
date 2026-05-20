@@ -108,6 +108,10 @@ class BlastHit:
             'qcovs': self.qcovs,
             'qcovhsp': self.qcovhsp
         }
+    
+    @classmethod
+    def from_dict(cls, d: Dict) -> 'BlastHit':
+        return cls(**d)
 
 
 def parse_blast_output(blast_output_path: Path, genome_id: str = "unknown") -> List[BlastHit]:

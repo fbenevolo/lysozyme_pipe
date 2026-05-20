@@ -6,6 +6,7 @@ include { FilterHitsAfterSSearch } from "../modules/local/filter_hits_after_ssea
 include { BedtoolsMergeBlastHits } from "../modules/local/bedtools_merge_blast_hits.nf"; 
 include { BedtoolsSaveMergedRegions } from "../modules/local/bedtools_save_merged_regions.nf";
 include { AnnotateRegionsWithBestProteins } from "../modules/local/annotate_regions_with_best_proteins.nf";
+include { AnnotatePseudogenes } from "../modules/local/annotate_pseudogenes.nf";
 
 workflow {
     main:
@@ -72,8 +73,15 @@ workflow {
         genome_id
     )
 
-    AnnotateRegionsWithBestProteins(
+    annotate_regions_with_best_proteins_out = AnnotateRegionsWithBestProteins(
         merge_blast_hits_out[1],
-        filtered_hits_after_ssearch_out
+        filtered_hits_after_ssearch_out,
+        genome_id
+    )
+
+    AnnotatePseudogenes(
+        annotate_regions_with_best_proteins_out,
+        params.genome_fasta,
+        params.min_disablements
     )
 }
