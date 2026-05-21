@@ -57,9 +57,9 @@ class PseudogeneAnnotation:
     is_pseudogene: bool                  # Se é classificado como pseudogene
     is_small_orf: bool = False           # If region is small (<300 nt / 100 aa)
     
-    def to_dict(self):
+    def to_json_dict(self):
         """Converte a anotação em dicionário."""
-        result = self.region_annotation.to_dict()
+        result = self.region_annotation.to_json_dict()
         result.update(self.disablements.to_dict())
         result['is_pseudogene'] = self.is_pseudogene
         result['is_small_orf'] = self.is_small_orf
@@ -77,14 +77,33 @@ class PseudogeneAnnotation:
             
         return result
     
-    def to_json_dict(self) -> Dict:
-        """Serialização completa para JSON — preserva estrutura aninhada."""
-        return {
-            'region_annotation': self.region_annotation.to_dict(),
-            'disablements': self.disablements.to_dict(),
-            'is_pseudogene': self.is_pseudogene,
-            'is_small_orf': self.is_small_orf,
-        }
+    def to_tsv_dict(self):
+        result = self.region_annotation.to_tsv_dict()
+        result.update(self.disablements.to_dict())
+        result['is_pseudogene'] = self.is_pseudogene
+        result['is_small_orf'] = self.is_small_orf
+        
+        # Add concatenated sequences for visualization
+        hsps = self.region_annotation.best_protein.hsps
+        if hsps:
+            # Sort HSPs by query start to ensure correct order
+            sorted_hsps = sorted(hsps, key=lambda h: h.qstart)
+            result['qseq'] = "".join(h.qseq for h in sorted_hsps)
+            result['sseq'] = "".join(h.sseq for h in sorted_hsps)
+        else:
+            result['qseq'] = ""
+            result['sseq'] = ""
+            
+        return result
+    
+    # def to_dict(self) -> Dict:
+    #     """Serialização completa para JSON — preserva estrutura aninhada."""
+    #     return {
+    #         'region_annotation': self.region_annotation.to_json_dict(),
+    #         'disablements': self.disablements.to_dict(),
+    #         'is_pseudogene': self.is_pseudogene,
+    #         'is_small_orf': self.is_small_orf,
+    #     }
     
     @classmethod
     def from_dict(cls, d: Dict) -> 'PseudogeneAnnotation':
@@ -750,7 +769,7 @@ def annotate_pseudogenes(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open('w') as f:
         for ann in pseudogene_annotations:
-            f.write(json.dumps(ann.to_dict()) + '\n')  # JSON Lines: 1 objeto por linha
+            f.write(json.dumps(ann.to_json_dict()) + '\n')  # JSON Lines: 1 objeto por linha
 
 
     # data = [ann.to_dict() for ann in pseudogene_annotations]
@@ -759,28 +778,6 @@ def annotate_pseudogenes(
     # df.to_csv(output_path, sep='\t', index=False)
 
     return pseudogene_annotations
-
-
-def save_pseudogene_annotations(
-    annotations: List[PseudogeneAnnotation],
-    output_path
-) -> None:
-    """
-    Salva anotações de pseudogenes em arquivo TSV.
-    
-    Args:
-        annotations: Lista de anotações de pseudogenes
-        output_path: Caminho para o arquivo de saída
-    """
-    logger.debug(f"Saving {len(annotations)} pseudogene annotations to: {output_path}")
-    
-    data = [ann.to_dict() for ann in annotations]
-    df = pd.DataFrame(data)
-    
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(output_path, sep='\t', index=False)
-    
-    logger.debug("Pseudogene annotations saved successfully")
 
 
 def calculate_subject_coverage_nt(hsps: List[BlastHit]) -> int:
@@ -1060,7 +1057,7 @@ REFERENCE PROTEIN COVERAGE ANALYSIS:
     
     return report
 
-def load_annotations_from_json(annotations_path: Path) -> List[RegionAnnotation]:
+def load_region_annotations_from_json(annotations_path: Path) -> List[RegionAnnotation]:
     """
     Carrega RegionAnnotations de um arquivo JSON Lines.
 
@@ -1083,5 +1080,5 @@ def load_annotations_from_json(annotations_path: Path) -> List[RegionAnnotation]
 
 import sys
 if __name__ == "__main__":
-    region_annotations = load_annotations_from_json(Path(sys.argv[1]))
+    region_annotations = load_region_annotations_from_json(Path(sys.argv[1]))
     annotate_pseudogenes(region_annotations, Path(sys.argv[2]), Path(sys.argv[4]), min_disablements=int(sys.argv[3]))

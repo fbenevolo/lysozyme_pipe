@@ -91,12 +91,28 @@ class RegionAnnotation:
     best_protein: ProteinHitGroup   # Proteína com maior densidade de score
     all_proteins: List[ProteinHitGroup]  # Todas as proteínas que mapearam
 
-    def to_dict(self) -> Dict:
+    def to_json_dict(self) -> Dict:
         """Serialização completa para JSON."""
         return {
             'region': self.region.to_dict(),
             'best_protein': self.best_protein.to_dict(),
             'all_proteins': [p.to_dict() for p in self.all_proteins],
+        }
+    
+    def to_tsv_dict(self) -> Dict:
+        """Convert annotation to dictionary for TSV files."""
+        return {
+            'chromosome': self.region.chromosome,
+            'start': self.region.start,
+            'end': self.region.end,
+            'length': self.region.length,
+            'strand': self.region.strand,
+            'best_protein_id': self.best_protein.protein_id,
+            'best_protein_score_density': self.best_protein.score_density,
+            'best_protein_total_score': self.best_protein.total_score,
+            'best_protein_total_length': self.best_protein.total_length,
+            'best_protein_num_hsps': len(self.best_protein.hsps),
+            'num_competing_proteins': len(self.all_proteins)
         }
     
     @classmethod
@@ -108,21 +124,6 @@ class RegionAnnotation:
             all_proteins=[ProteinHitGroup.from_dict(p) for p in d['all_proteins']],
         )
     
-    # def to_dict(self) -> Dict:
-    #     """Convert annotation to dictionary."""
-    #     return {
-    #         'chromosome': self.region.chromosome,
-    #         'start': self.region.start,
-    #         'end': self.region.end,
-    #         'length': self.region.length,
-    #         'strand': self.region.strand,
-    #         'best_protein_id': self.best_protein.protein_id,
-    #         'best_protein_score_density': self.best_protein.score_density,
-    #         'best_protein_total_score': self.best_protein.total_score,
-    #         'best_protein_total_length': self.best_protein.total_length,
-    #         'best_protein_num_hsps': len(self.best_protein.hsps),
-    #         'num_competing_proteins': len(self.all_proteins)
-    #     }
 
 
 def calculate_score_density(hsps: List[BlastHit]) -> float:
@@ -321,7 +322,7 @@ def annotate_regions_with_best_proteins(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open('w') as f:
         for ann in annotations:
-            f.write(json.dumps(ann.to_dict()) + '\n')  # JSON Lines: 1 objeto por linha
+            f.write(json.dumps(ann.to_json_dict()) + '\n')  # JSON Lines: 1 objeto por linha
 
     logger.debug("Annotations saved successfully in JSONL")
 

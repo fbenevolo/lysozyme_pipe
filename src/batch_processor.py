@@ -13,14 +13,14 @@ from datetime import datetime
 from src.blast_search import run_blast_pipeline_step
 from src.blast_filter import run_filtering_step, parse_blast_output
 from src.ssearch_realign import realign_filtered_hits_parallel
-from src.bedtools_merge import merge_blast_hits, save_merged_regions
-from src.score_density import annotate_regions_with_best_proteins, save_region_annotations
+from src.bedtools_merge import merge_blast_hits
+from src.score_density import annotate_regions_with_best_proteins
 from src.pseudogene_detection import (
     annotate_pseudogenes, 
-    save_pseudogene_annotations,
     save_coverage_statistics,
     generate_summary_report
 )
+from save_pseudogene_annotations import save_pseudogene_annotations
 from src.export_gff3 import export_to_gff3
 from src.comparative_analysis import generate_comparative_report
 from src.config import (
@@ -242,9 +242,11 @@ class BatchProcessor:
             
             # STEP 5: SCORE DENSITY
             logger.debug(f"[{genome_id}] STEP 5: Score Density Calculation")
+            annotations_output = final_dir / "region_annotations.jsonl"
             region_annotations = annotate_regions_with_best_proteins(
                 merged_regions,
-                filtered_hits
+                filtered_hits,
+                annotations_output
             )
             logger.debug(f"  Annotated regions: {len(region_annotations)}")
             

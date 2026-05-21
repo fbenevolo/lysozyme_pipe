@@ -16,7 +16,7 @@ def apply_final_identity(pseudogene_annotations: List[PseudogeneAnnotation], fin
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, 'w') as f:
          for ann in filtered_annotations:
-            f.write(json.dumps(ann.to_dict()) + '\n')  # JSON Lines: 1 objeto por linha
+            f.write(json.dumps(ann.to_json_dict()) + '\n')  # JSON Lines: 1 objeto por linha
 
     return filtered_annotations
 

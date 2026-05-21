@@ -9,6 +9,8 @@ include { AnnotateRegionsWithBestProteins } from "../modules/local/annotate_regi
 include { AnnotatePseudogenes } from "../modules/local/annotate_pseudogenes.nf";
 include { ApplyCoverage } from "../modules/local/apply_coverage.nf";
 include { ApplyFinalIdentity } from "../modules/local/apply_final_identity.nf";
+include { SavePseudogeneAnnotations } from "../modules/local/save_pseudogene_annotations.nf";
+include { ExportToGFF3 } from "../modules/local/export_to_gff3.nf";
 
 workflow {
     main:
@@ -100,4 +102,8 @@ workflow {
     )
 
     pseudogene_annotation_final = (params.final_min_identity) ? pseudogene_annotation_with_final_identity : pseudogene_annotation_parcial
+
+    SavePseudogeneAnnotations(pseudogene_annotation_final)
+
+    ExportToGFF3(pseudogene_annotation_final, genome_id)
 }

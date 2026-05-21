@@ -21,7 +21,7 @@ def apply_coverage(pseudogene_annotations: List[PseudogeneAnnotation], min_cover
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open('w') as f:
         for ann in filtered_annotations:
-            f.write(json.dumps(ann.to_dict()) + '\n')  # JSON Lines: 1 objeto por linha
+            f.write(json.dumps(ann.to_json_dict()) + '\n')  # JSON Lines: 1 objeto por linha
     
     return filtered_annotations
 
