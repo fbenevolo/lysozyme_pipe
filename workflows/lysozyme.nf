@@ -11,7 +11,8 @@ include { ApplyCoverage } from "../modules/local/apply_coverage.nf";
 include { ApplyFinalIdentity } from "../modules/local/apply_final_identity.nf";
 include { SavePseudogeneAnnotations } from "../modules/local/save_pseudogene_annotations.nf";
 include { ExportToGFF3 } from "../modules/local/export_to_gff3.nf";
-include { SaveCoverageStatistics } from "../modules/local/save_coverage_statistics.nf"
+include { SaveCoverageStatistics } from "../modules/local/save_coverage_statistics.nf";
+include { GenerateSummaryReport } from "../modules/local/generate_summary_report.nf";
 
 workflow {
     main:
@@ -105,8 +106,7 @@ workflow {
     pseudogene_annotation_final = (params.final_min_identity) ? pseudogene_annotation_with_final_identity : pseudogene_annotation_parcial
 
     SavePseudogeneAnnotations(pseudogene_annotation_final)
-
     ExportToGFF3(pseudogene_annotation_final, genome_id)
-
     SaveCoverageStatistics(pseudogene_annotation_final)
+    GenerateSummaryReport(pseudogene_annotation_final, params.min_coverage)
 }

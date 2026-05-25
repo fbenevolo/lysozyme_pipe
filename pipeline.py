@@ -24,15 +24,13 @@ from src.blast_filter import run_filtering_step
 from src.ssearch_realign import realign_filtered_hits
 from src.bedtools_merge import merge_blast_hits
 from src.score_density import annotate_regions_with_best_proteins
-from src.pseudogene_detection import (
-    annotate_pseudogenes,
-    generate_summary_report
-)
+from src.pseudogene_detection import annotate_pseudogenes
 from save_coverage_statistics import save_coverage_statistics
 from save_pseudogene_annotations import save_pseudogene_annotations
 from apply_coverage_filter import apply_coverage
 from apply_final_identity_filter import apply_final_identity
 from src.export_gff3 import export_to_gff3
+from generate_summary_report import generate_summary_report
 from src.filter_ssearch import filter_ssearch_by_evalue
 from src.filter_hits_after_ssearch import filter_hits_after_ssearch
 from src.bedtools_save_merged_regions import save_merged_regions
@@ -393,18 +391,14 @@ def run_pipeline(
     coverage_output = final_dir / "coverage_statistics.tsv"
     save_coverage_statistics(pseudogene_annotations, coverage_output)
     
-    '''
-    # Generate summary report
-    summary = generate_summary_report(pseudogene_annotations, min_coverage)
-    print(summary)
     
+    # Generate summary report
     report_file = final_dir / "summary_report.txt"
-    with open(report_file, 'w') as f:
-        f.write(summary)
+    summary = generate_summary_report(pseudogene_annotations, report_file, min_coverage=min_coverage)
+    print(summary)
     
     num_pseudogenes = sum(1 for ann in pseudogene_annotations if ann.is_pseudogene)
     logger.info(f"Complete: {len(pseudogene_annotations)} regions, {num_pseudogenes} pseudogenes")
-    '''
 
 def main():
     """Função principal do pipeline."""
