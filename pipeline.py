@@ -26,9 +26,9 @@ from src.bedtools_merge import merge_blast_hits
 from src.score_density import annotate_regions_with_best_proteins
 from src.pseudogene_detection import (
     annotate_pseudogenes,
-    save_coverage_statistics,
     generate_summary_report
 )
+from save_coverage_statistics import save_coverage_statistics
 from save_pseudogene_annotations import save_pseudogene_annotations
 from apply_coverage_filter import apply_coverage
 from apply_final_identity_filter import apply_final_identity
@@ -388,11 +388,12 @@ def run_pipeline(
     gff3_output = final_dir / "lysozyme_annotations.gff3"
     export_to_gff3(pseudogene_annotations, genome_id, gff3_output)
     
-    '''
+    
     # Save coverage statistics for detailed analysis
     coverage_output = final_dir / "coverage_statistics.tsv"
     save_coverage_statistics(pseudogene_annotations, coverage_output)
     
+    '''
     # Generate summary report
     summary = generate_summary_report(pseudogene_annotations, min_coverage)
     print(summary)

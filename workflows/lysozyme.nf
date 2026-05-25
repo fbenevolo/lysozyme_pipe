@@ -11,6 +11,7 @@ include { ApplyCoverage } from "../modules/local/apply_coverage.nf";
 include { ApplyFinalIdentity } from "../modules/local/apply_final_identity.nf";
 include { SavePseudogeneAnnotations } from "../modules/local/save_pseudogene_annotations.nf";
 include { ExportToGFF3 } from "../modules/local/export_to_gff3.nf";
+include { SaveCoverageStatistics } from "../modules/local/save_coverage_statistics.nf"
 
 workflow {
     main:
@@ -106,4 +107,6 @@ workflow {
     SavePseudogeneAnnotations(pseudogene_annotation_final)
 
     ExportToGFF3(pseudogene_annotation_final, genome_id)
+
+    SaveCoverageStatistics(pseudogene_annotation_final)
 }
