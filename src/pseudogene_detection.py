@@ -3,7 +3,9 @@ Módulo para detecção de mutações e caracterização de pseudogenes.
 Implementa a etapa 6 do pipeline: Detecção de Mutação e Pseudogenes.
 """
 
+import json
 import logging
+import pandas as pd
 from typing import List, Set, Dict, Optional
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,6 +22,7 @@ from src.config import (
     MIN_REGION_SIZE_NT,
     MIN_ALIGNMENT_SIZE_AA
 )
+from src.bedtools_merge import GenomicRegion
 from src.blast_filter import BlastHit
 from src.score_density import RegionAnnotation, ProteinHitGroup
 
@@ -54,9 +57,9 @@ class PseudogeneAnnotation:
     is_pseudogene: bool                  # Se é classificado como pseudogene
     is_small_orf: bool = False           # If region is small (<300 nt / 100 aa)
     
-    def to_dict(self):
+    def to_json_dict(self):
         """Converte a anotação em dicionário."""
-        result = self.region_annotation.to_dict()
+        result = self.region_annotation.to_json_dict()
         result.update(self.disablements.to_dict())
         result['is_pseudogene'] = self.is_pseudogene
         result['is_small_orf'] = self.is_small_orf
@@ -73,6 +76,70 @@ class PseudogeneAnnotation:
             result['sseq'] = ""
             
         return result
+    
+    def to_tsv_dict(self):
+        result = self.region_annotation.to_tsv_dict()
+        result.update(self.disablements.to_dict())
+        result['is_pseudogene'] = self.is_pseudogene
+        result['is_small_orf'] = self.is_small_orf
+        
+        # Add concatenated sequences for visualization
+        hsps = self.region_annotation.best_protein.hsps
+        if hsps:
+            # Sort HSPs by query start to ensure correct order
+            sorted_hsps = sorted(hsps, key=lambda h: h.qstart)
+            result['qseq'] = "".join(h.qseq for h in sorted_hsps)
+            result['sseq'] = "".join(h.sseq for h in sorted_hsps)
+        else:
+            result['qseq'] = ""
+            result['sseq'] = ""
+            
+        return result
+    
+    # def to_dict(self) -> Dict:
+    #     """Serialização completa para JSON — preserva estrutura aninhada."""
+    #     return {
+    #         'region_annotation': self.region_annotation.to_json_dict(),
+    #         'disablements': self.disablements.to_dict(),
+    #         'is_pseudogene': self.is_pseudogene,
+    #         'is_small_orf': self.is_small_orf,
+    #     }
+    
+    @classmethod
+    def from_dict(cls, d: Dict) -> 'PseudogeneAnnotation':
+        # Reconstrói RegionAnnotation a partir da estrutura plana
+        region = GenomicRegion(
+            genome_id=d['region']['genome_id'],
+            chromosome=d['region']['chromosome'],
+            start=d['region']['start'],
+            end=d['region']['end'],
+            strand=d['region']['strand'],
+            num_hsps=d['region']['num_hsps'],
+            mean_score=d['region']['mean_score'],
+            min_score=d['region']['min_score'],
+            max_score=d['region']['max_score'],
+            query_ids=d['region']['query_ids'].split(',') if isinstance(d['region']['query_ids'], str) else d['region']['query_ids'],
+        )
+        region_annotation = RegionAnnotation(
+            region=region,
+            best_protein=ProteinHitGroup.from_dict(d['best_protein']),
+            all_proteins=[ProteinHitGroup.from_dict(p) for p in d['all_proteins']],
+        )
+        disablements = DisablementCounts(
+            non_synonymous_substitutions=d['non_synonymous_substitutions'],
+            in_frame_indels=d['in_frame_indels'],
+            frameshifts=d['frameshifts'],
+            missing_start_codon=d['missing_start_codon'],
+            missing_stop_codon=d['missing_stop_codon'],
+            premature_stop_codons=d['premature_stop_codons'],
+            size_mismatch=d['size_mismatch'],
+        )
+        return cls(
+            region_annotation=region_annotation,
+            disablements=disablements,
+            is_pseudogene=d['is_pseudogene'],
+            is_small_orf=d.get('is_small_orf', False),
+        )
 
 
 def count_non_synonymous_substitutions(query_seq: str, subject_seq: str) -> int:
@@ -555,6 +622,7 @@ def classify_as_pseudogene(
 def annotate_pseudogenes(
     region_annotations: List[RegionAnnotation],
     genome_fasta_path: Path,
+    output_path: Path,
     min_disablements: int = 1,
     padding: int = 150
 ) -> List[PseudogeneAnnotation]:
@@ -568,6 +636,7 @@ def annotate_pseudogenes(
         region_annotations: Lista de anotações de região com melhores proteínas
         genome_fasta_path: Caminho para o arquivo FASTA do genoma
         min_disablements: Número mínimo de mutações para classificar como pseudogene
+        output_path: Caminho para salvar a lista de anotações de pseudogenes 
         padding: Nucleotídeos extras para buscar start/stop (padrão: 150bp)
     
     Returns:
@@ -593,7 +662,7 @@ def annotate_pseudogenes(
         # Check start: if alignment has Methionine at beginning (any qstart), start codon exists
         first_qseq_clean = first_hsp.qseq.lstrip('-')
         has_start_in_alignment = (
-            len(first_qseq_clean) > 0 and 
+            len(first_qseq_clean) > 0 and
             first_qseq_clean[0] == 'M'
             # Note: qstart position doesn't matter - divergent N-terminals are normal
         )
@@ -694,32 +763,21 @@ def annotate_pseudogenes(
     
     num_pseudogenes = sum(1 for ann in pseudogene_annotations if ann.is_pseudogene)
     logger.debug(f"Pseudogenes: {num_pseudogenes}/{len(pseudogene_annotations)}")
-    
-    return pseudogene_annotations
 
+    logger.debug(f"Saving {len(pseudogene_annotations)} pseudogene annotations to: {output_path}")
 
-def save_pseudogene_annotations(
-    annotations: List[PseudogeneAnnotation],
-    output_path
-) -> None:
-    """
-    Salva anotações de pseudogenes em arquivo TSV.
-    
-    Args:
-        annotations: Lista de anotações de pseudogenes
-        output_path: Caminho para o arquivo de saída
-    """
-    import pandas as pd
-    
-    logger.debug(f"Saving {len(annotations)} pseudogene annotations to: {output_path}")
-    
-    data = [ann.to_dict() for ann in annotations]
-    df = pd.DataFrame(data)
-    
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(output_path, sep='\t', index=False)
-    
-    logger.debug("Pseudogene annotations saved successfully")
+    with output_path.open('w') as f:
+        for ann in pseudogene_annotations:
+            f.write(json.dumps(ann.to_json_dict()) + '\n')  # JSON Lines: 1 objeto por linha
+
+
+    # data = [ann.to_dict() for ann in pseudogene_annotations]
+    # df = pd.DataFrame(data)
+    # output_path.parent.mkdir(parents=True, exist_ok=True)
+    # df.to_csv(output_path, sep='\t', index=False)
+
+    return pseudogene_annotations
 
 
 def calculate_subject_coverage_nt(hsps: List[BlastHit]) -> int:
@@ -760,241 +818,28 @@ def calculate_subject_coverage_nt(hsps: List[BlastHit]) -> int:
     return total
 
 
-def save_coverage_statistics(
-    annotations: List[PseudogeneAnnotation],
-    output_path
-) -> None:
+def load_region_annotations_from_json(annotations_path: Path) -> List[RegionAnnotation]:
     """
-    Save detailed coverage statistics for further analysis.
-    
-    Creates TSV with coverage ratio, alignment details, and classification
-    for discussion about size-based validation approaches.
-    
-    Args:
-        annotations: List of pseudogene annotations
-        output_path: Path to coverage statistics output file
-    """
-    import pandas as pd
-    
-    logger.debug(f"Saving coverage statistics to: {output_path}")
-    
-    coverage_data = []
-    for ann in annotations:
-        hsps = ann.region_annotation.best_protein.hsps
-        if hsps:
-            min_qstart = min(hsp.qstart for hsp in hsps)
-            max_qend = max(hsp.qend for hsp in hsps)
-            coverage_len = max_qend - min_qstart + 1
-            ref_len = hsps[0].qlen
-            coverage_ratio = coverage_len / ref_len if ref_len > 0 else 0
-            
-            # Calculate genomic length
-            genomic_len_nt = ann.region_annotation.region.length
-            genomic_len_aa = genomic_len_nt / 3
-            
-            # Calculate subject coverage (nt)
-            alignment_coverage_nt = calculate_subject_coverage_nt(hsps)
-            
-            # Calculate reference coverage in nt (alignment span on reference * 3)
-            reference_coverage_nt = coverage_len * 3
-            
-            # Calculate alignment/genomic ratio (User requested metric)
-            # (reference_coverage_nt) / genomic_region_nt
-            alignment_genomic_ratio = reference_coverage_nt / genomic_len_nt if genomic_len_nt > 0 else 0
-            
-            # Determine classification
-            if ann.is_pseudogene:
-                if ann.is_small_orf:
-                    classification = 'Pseudogene (Small ORF)'
-                else:
-                    classification = 'Pseudogene (Detected)'
-            else:
-                if ann.is_small_orf:
-                    classification = 'Functional (Small ORF)'
-                else:
-                    classification = 'Functional (Possible Gene)'
-            
-            coverage_data.append({
-                'chromosome': ann.region_annotation.region.chromosome,
-                'start': ann.region_annotation.region.start,
-                'end': ann.region_annotation.region.end,
-                'strand': ann.region_annotation.region.strand,
-                'protein_id': ann.region_annotation.best_protein.protein_id,
-                'is_pseudogene': ann.is_pseudogene,
-                'is_small_orf': ann.is_small_orf,
-                'classification': classification,
-                'alignment_coverage_aa': coverage_len,
-                'alignment_coverage_nt': alignment_coverage_nt,
-                'reference_coverage_nt': reference_coverage_nt,
-                'alignment_genomic_ratio': round(alignment_genomic_ratio, 3),
-                'reference_length_aa': ref_len,
-                'coverage_ratio': round(coverage_ratio, 3),
-                'genomic_region_nt': genomic_len_nt,
-                'genomic_region_aa': round(genomic_len_aa, 1),
-                'num_hsps': len(hsps),
-                'qstart_min': min_qstart,
-                'qend_max': max_qend,
-                'missing_start_codon': ann.disablements.missing_start_codon,
-                'missing_stop_codon': ann.disablements.missing_stop_codon,
-                'premature_stops': ann.disablements.premature_stop_codons,
-                'frameshifts': ann.disablements.frameshifts
-            })
-    
-    df = pd.DataFrame(coverage_data)
-    
-    # Sort by coverage ratio (ascending) to highlight problematic cases
-    df = df.sort_values('coverage_ratio', ascending=True)
-    
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(output_path, sep='\t', index=False)
-    
-    logger.debug(f"Coverage statistics saved: {len(coverage_data)} regions")
+    Carrega RegionAnnotations de um arquivo JSON Lines.
 
-
-def generate_summary_report(annotations: List[PseudogeneAnnotation], min_coverage: float = 0.8) -> str:
-    """
-    Gera relatório resumido das anotações.
-    
     Args:
-        annotations: Lista de anotações
-        min_coverage: Limite de cobertura para relatório (default: 0.8)
-    
+        annotations_path: Caminho para o arquivo .jsonl gerado por annotate_regions_with_best_proteins
+
     Returns:
-        String com o relatório formatado
+        Lista de RegionAnnotation completamente reconstruída
     """
-    total_regions = len(annotations)
-    
-    # Classification Breakdown
-    functional_anns = [ann for ann in annotations if not ann.is_pseudogene]
-    pseudogene_anns = [ann for ann in annotations if ann.is_pseudogene]
-    
-    num_functional = len(functional_anns)
-    num_pseudogenes = len(pseudogene_anns)
-    
-    # Functional Sub-categories
-    func_possible_genes = sum(1 for ann in functional_anns if not ann.is_small_orf)
-    func_small_orfs = sum(1 for ann in functional_anns if ann.is_small_orf)
-    
-    # Pseudogene Sub-categories
-    pseudo_detected = sum(1 for ann in pseudogene_anns if not ann.is_small_orf)
-    pseudo_small_orfs = sum(1 for ann in pseudogene_anns if ann.is_small_orf)
-    
-    # Estatísticas de mutações
-    total_substitutions = sum(ann.disablements.non_synonymous_substitutions for ann in annotations)
-    total_indels = sum(ann.disablements.in_frame_indels for ann in annotations)
-    total_frameshifts = sum(ann.disablements.frameshifts for ann in annotations)
-    total_missing_start = sum(ann.disablements.missing_start_codon for ann in annotations)
-    total_missing_stop = sum(ann.disablements.missing_stop_codon for ann in annotations)
-    total_premature_stops = sum(ann.disablements.premature_stop_codons for ann in annotations)
-    
-    # NOVA SEÇÃO: Análise de cobertura e tamanho
-    coverage_stats = []
-    for ann in annotations:
-            
-        hsps = ann.region_annotation.best_protein.hsps
-        if hsps:
-            min_qstart = min(hsp.qstart for hsp in hsps)
-            max_qend = max(hsp.qend for hsp in hsps)
-            coverage_len = max_qend - min_qstart + 1
-            ref_len = hsps[0].qlen
-            coverage_ratio = coverage_len / ref_len if ref_len > 0 else 0
-            
-            coverage_stats.append({
-                'coverage_len': coverage_len,
-                'ref_len': ref_len,
-                'ratio': coverage_ratio,
-                'is_pseudogene': ann.is_pseudogene,
-                'is_small_orf': ann.is_small_orf
-            })
-    
-    # Helper function for stats
-    def calc_stats(ratios):
-        if not ratios:
-            return 0, 0, 0, 0
-        avg = sum(ratios) / len(ratios)
-        mn = min(ratios)
-        mx = max(ratios)
-        below_threshold = sum(1 for r in ratios if r < min_coverage)
-        return avg, mn, mx, below_threshold
-    
-    # DEBUG
-    # print(f"DEBUG: min_coverage={min_coverage}")
+    annotations = []
+    with annotations_path.open('r') as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                d = json.loads(line)
+                annotations.append(RegionAnnotation.from_dict(d))
 
-    # 1. Functional - Possible Genes
-    func_possible_ratios = [s['ratio'] for s in coverage_stats if not s['is_pseudogene'] and not s['is_small_orf']]
-    fp_avg, fp_min, fp_max, fp_below = calc_stats(func_possible_ratios)
-    fp_count = len(func_possible_ratios)
+    logger.debug(f"Loaded {len(annotations)} region annotations from {annotations_path}")
+    return annotations
 
-    # 2. Functional - Small ORFs
-    func_small_ratios = [s['ratio'] for s in coverage_stats if not s['is_pseudogene'] and s['is_small_orf']]
-    fs_avg, fs_min, fs_max, fs_below = calc_stats(func_small_ratios)
-    fs_count = len(func_small_ratios)
-
-    # 3. Pseudogenes - Detected
-    pseudo_detected_ratios = [s['ratio'] for s in coverage_stats if s['is_pseudogene'] and not s['is_small_orf']]
-    pd_avg, pd_min, pd_max, pd_below = calc_stats(pseudo_detected_ratios)
-    pd_count = len(pseudo_detected_ratios)
-
-    # 4. Pseudogenes - Small ORFs
-    pseudo_small_ratios = [s['ratio'] for s in coverage_stats if s['is_pseudogene'] and s['is_small_orf']]
-    ps_avg, ps_min, ps_max, ps_below = calc_stats(pseudo_small_ratios)
-    ps_count = len(pseudo_small_ratios)
-    
-    report = f"""
-╭──────────────────────────────────────────────────────────────────╮
-│          LYSOZYME PSEUDOGENE ANNOTATION REPORT                   │
-╰──────────────────────────────────────────────────────────────────╯
-
-GENERAL SUMMARY:
-  Total regions analyzed:          {total_regions}
-  
-  Classification:
-    Functional Genes:                {num_functional} ({100*num_functional/total_regions if total_regions else 0:.1f}%)
-      - Possible Genes:              {func_possible_genes} ({100*func_possible_genes/num_functional if num_functional else 0:.1f}%)
-      - Small ORFs:                  {func_small_orfs} ({100*func_small_orfs/num_functional if num_functional else 0:.1f}%)
-      
-    Pseudogenes:                     {num_pseudogenes} ({100*num_pseudogenes/total_regions if total_regions else 0:.1f}%)
-      - Detected Pseudogenes:        {pseudo_detected} ({100*pseudo_detected/num_pseudogenes if num_pseudogenes else 0:.1f}%)
-      - Small ORFs:                  {pseudo_small_orfs} ({100*pseudo_small_orfs/num_pseudogenes if num_pseudogenes else 0:.1f}%)
-
-MUTATION STATISTICS:
-  Non-synonymous substitutions:    {total_substitutions}
-  In-frame indels:                 {total_indels}
-  Frameshifts:                     {total_frameshifts}
-  Missing start codon:             {total_missing_start}
-  Missing stop codon:              {total_missing_stop}
-  Premature stop codons:           {total_premature_stops}
-  
-  Total inactivating mutations:    {total_substitutions + total_indels + total_frameshifts + total_missing_start + total_missing_stop + total_premature_stops}
-
-REFERENCE PROTEIN COVERAGE ANALYSIS:
-  (Ratio = Alignment Coverage / Reference Size)
-  
-  1. Functional - Possible Genes ({fp_count} regions):
-    Mean coverage ratio:             {fp_avg:.2f}
-    Minimum ratio:                   {fp_min:.2f}
-    Maximum ratio:                   {fp_max:.2f}
-    Regions with coverage <{int(min_coverage*100)}%:      {fp_below} ({100*fp_below/fp_count if fp_count else 0:.1f}%)
-
-  2. Functional - Small ORFs ({fs_count} regions):
-    Mean coverage ratio:             {fs_avg:.2f}
-    Minimum ratio:                   {fs_min:.2f}
-    Maximum ratio:                   {fs_max:.2f}
-    Regions with coverage <{int(min_coverage*100)}%:      {fs_below} ({100*fs_below/fs_count if fs_count else 0:.1f}%)
-  
-  3. Pseudogenes - Detected ({pd_count} regions):
-    Mean coverage ratio:             {pd_avg:.2f}
-    Minimum ratio:                   {pd_min:.2f}
-    Maximum ratio:                   {pd_max:.2f}
-    Regions with coverage <{int(min_coverage*100)}%:      {pd_below} ({100*pd_below/pd_count if pd_count else 0:.1f}%)
-
-  4. Pseudogenes - Small ORFs ({ps_count} regions):
-    Mean coverage ratio:             {ps_avg:.2f}
-    Minimum ratio:                   {ps_min:.2f}
-    Maximum ratio:                   {ps_max:.2f}
-    Regions with coverage <{int(min_coverage*100)}%:      {ps_below} ({100*ps_below/ps_count if ps_count else 0:.1f}%)
-
-
-"""
-    
-    return report
+import sys
+if __name__ == "__main__":
+    region_annotations = load_region_annotations_from_json(Path(sys.argv[1]))
+    annotate_pseudogenes(region_annotations, Path(sys.argv[2]), Path(sys.argv[4]), min_disablements=int(sys.argv[3]))

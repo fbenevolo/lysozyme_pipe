@@ -57,6 +57,11 @@ class GenomicRegion:
             'max_score': self.max_score,
             'query_ids': ','.join(self.query_ids) if isinstance(self.query_ids, list) else self.query_ids
         }
+    
+    @classmethod
+    def from_dict(cls, d: Dict) -> 'GenomicRegion':
+        d = {k: v for k, v in d.items() if k != 'length'}
+        return cls(**d)
 
 
 def blast_hits_to_bed(
@@ -197,7 +202,7 @@ def parse_merged_bed(merged_bed_path: Path, genome_id: str = "unknown") -> List[
         merged_bed_path,
         sep='\t',
         header=None,
-        names=['chromosome', 'start', 'end', 'num_hsps', 'mean_score', 
+        names=['chromosome', 'start', 'end', 'num_hsps', 'mean_score',
                'min_score', 'max_score', 'strands']
     )
     
@@ -268,22 +273,10 @@ def merge_blast_hits(
     regions = parse_merged_bed(merged_bed_path, genome_id=genome_id)
     
     return regions
+    
 
-
-def save_merged_regions(regions: List[GenomicRegion], output_path: Path) -> None:
-    """
-    Save merged regions to TSV file.
-    
-    Args:
-        regions: List of genomic regions
-        output_path: Path to output file
-    """
-    logger.debug(f"Saving {len(regions)} merged regions to: {output_path}")
-    
-    data = [region.to_dict() for region in regions]
-    df = pd.DataFrame(data)
-    
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(output_path, sep='\t', index=False)
-    
-    logger.debug("Merged regions saved successfully")
+import sys
+from src.ssearch_realign import load_blast_hits_from_tsv
+if __name__ == "__main__":
+    blast_hits = load_blast_hits_from_tsv(sys.argv[1])
+    merge_blast_hits(blast_hits, Path(sys.argv[2]), genome_id=sys.argv[3])

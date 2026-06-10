@@ -156,7 +156,7 @@ def run_ssearch36(
             result = subprocess.run(
                 command,
                 stdout=out,
-                stderr=subprocess.DEVNULL,  # Silence SSEARCH messages
+                stderr=subprocess.PIPE,  # Silence SSEARCH messages
                 text=True,
                 check=True
             )
@@ -377,6 +377,9 @@ def realign_filtered_hits_parallel(
     Returns:
         Dictionary mapping hit identifier to its SSEARCH alignment
     """
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     # Detect number of CPUs if not specified
     if num_threads is None:
         num_threads = max(1, multiprocessing.cpu_count() - 1)
@@ -407,6 +410,44 @@ def realign_filtered_hits_parallel(
                 realignments[hit_key] = alignment
             else:
                 logger.debug(f"SSEARCH alignment filtered by E-value: {alignment.evalue:.2e} > {SSEARCH_EVALUE_THRESHOLD:.2e}")
+
+    realignments_output = output_dir / "ssearch_realignments.tsv"
+    with open(realignments_output, 'w') as f:
+        f.write("hit_key\tquery_id\tsubject_id\tidentity\talignment_length\tmismatches\tgap_opens\tquery_start\tquery_end\tsubject_start\tsubject_end\tevalue\tbit_score\traw_score\tquery_seq\tsubject_seq\n")
+        for key, aln in realignments.items():
+            f.write(f"{key}\t{aln.query_id}\t{aln.subject_id}\t{aln.identity:.2f}\t"
+                    f"{aln.alignment_length}\t{aln.mismatches}\t{aln.gap_opens}\t"
+                    f"{aln.query_start}\t{aln.query_end}\t{aln.subject_start}\t"
+                    f"{aln.subject_end}\t{aln.evalue:.2e}\t{aln.bit_score:.2f}\t"
+                    f"{aln.raw_score}\t{aln.query_seq}\t{aln.subject_seq}\n")
+        
+        # for key, aln in realignments.items():
+        #     f.write(f"{key}\t{aln.query_id}\t{aln.subject_id}\t"
+        #            f"{aln.identity:.2f}\t{aln.evalue:.2e}\t{aln.bit_score:.2f}\n")
     
     logger.debug(f"Parallel realignment complete. Total: {len(realignments)} alignments (after E-value filter)")
     return realignments
+
+
+import pandas as pd
+import sys
+def load_blast_hits_from_tsv(tsv_path: Path) -> List[BlastHit]:
+    """
+    Args:
+        tsv_path: Path to tsv containing hits
+    
+    Returns:
+        List containing BlastHit objects
+    """
+    # Lê o TSV
+    df = pd.read_csv(tsv_path, sep='\t')
+    
+    # Converte o DataFrame de volta para uma lista de objetos BlastHit
+    # O to_dict('records') cria uma lista de dicionários onde as chaves são as colunas
+    hits = [BlastHit(**row) for row in df.to_dict('records')]
+    return hits
+
+if __name__ == "__main__":
+    tsv_file = sys.argv[1]
+    hits = load_blast_hits_from_tsv(tsv_file)
+    realign_filtered_hits_parallel(hits, Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4]), sys.argv[5])

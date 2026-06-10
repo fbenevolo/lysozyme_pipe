@@ -214,13 +214,18 @@ def run_blast_pipeline_step(
         Path to file with BLAST results
     """
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Create BLAST database
     db_path = output_dir / "genome_db"
-    create_blast_database(genome_fasta, db_path, makeblastdb_path=makeblastdb_path)
     
+    create_blast_database(genome_fasta, db_path, makeblastdb_path=makeblastdb_path)
+
     # Execute tblastn search
     blast_output = output_dir / "blast_results.tsv"
-    run_tblastn_search(lysozyme_fasta, db_path, blast_output, blast_params, tblastn_path)
     
+    run_tblastn_search(lysozyme_fasta, db_path, blast_output, blast_params, tblastn_path)
     return blast_output
+
+import sys
+if __name__ == '__main__':
+    run_blast_pipeline_step(Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3]))

@@ -22,15 +22,18 @@ from src.dependencies import verify_and_install_dependencies
 from src.blast_search import run_blast_pipeline_step
 from src.blast_filter import run_filtering_step
 from src.ssearch_realign import realign_filtered_hits
-from src.bedtools_merge import merge_blast_hits, save_merged_regions
-from src.score_density import annotate_regions_with_best_proteins, save_region_annotations
-from src.pseudogene_detection import (
-    annotate_pseudogenes,
-    save_pseudogene_annotations,
-    save_coverage_statistics,
-    generate_summary_report
-)
+from src.bedtools_merge import merge_blast_hits
+from src.score_density import annotate_regions_with_best_proteins
+from src.pseudogene_detection import annotate_pseudogenes
+from save_coverage_statistics import save_coverage_statistics
+from save_pseudogene_annotations import save_pseudogene_annotations
+from apply_coverage_filter import apply_coverage
+from apply_final_identity_filter import apply_final_identity
 from src.export_gff3 import export_to_gff3
+from generate_summary_report import generate_summary_report
+from src.filter_ssearch import filter_ssearch_by_evalue
+from src.filter_hits_after_ssearch import filter_hits_after_ssearch
+from src.bedtools_save_merged_regions import save_merged_regions
 
 
 def setup_logging(log_file: Path = None, verbose: bool = False) -> None:
@@ -267,17 +270,18 @@ def run_pipeline(
         min_score,
         genome_id=genome_id
     )
-    
+
     if not filtered_hits:
         logger.error("No hits passed filtering")
         return
+
     
     # STEP 3: SSEARCH realignment (silent)
     ssearch_dir = output_dir / "ssearch"
-    ssearch_dir.mkdir(parents=True, exist_ok=True)
-    
+    # ssearch_dir.mkdir(parents=True, exist_ok=True)
+
     from src.ssearch_realign import realign_filtered_hits_parallel
-    
+
     ssearch_alignments = realign_filtered_hits_parallel(
         filtered_hits=filtered_hits,
         query_fasta_path=lysozyme_fasta,
@@ -286,50 +290,23 @@ def run_pipeline(
         ssearch_path=deps['ssearch36'],
         num_threads=num_threads
     )
-    
+
+    # Filter realignments by E-value
+    ssearch_output = ssearch_dir / "ssearch_realignments_filtered_by_evalue.tsv"
+    filtered_ssearch = filter_ssearch_by_evalue(ssearch_alignments, ssearch_output)
+
     logger.debug(f"SSEARCH realignments complete: {len(ssearch_alignments)}")
     
-    # Filter realignments by E-value
-    evalue_threshold = 1e-7
-    filtered_ssearch = {key: aln for key, aln in ssearch_alignments.items() 
-                       if aln.evalue <= evalue_threshold}
-    
-    logger.debug(f"Filtering SSEARCH by E-value <= {evalue_threshold:.0e}")
     logger.debug(f"  - Before filtering: {len(ssearch_alignments)} realignments")
     logger.debug(f"  - After filtering: {len(filtered_ssearch)} realignments")
     
-    # Save SSEARCH results
-    ssearch_output = ssearch_dir / "ssearch_realignments.tsv"
-    with open(ssearch_output, 'w') as f:
-        f.write("hit_key\tquery_id\tsubject_id\tidentity\tevalue\tbit_score\n")
-        for key, aln in filtered_ssearch.items():
-            f.write(f"{key}\t{aln.query_id}\t{aln.subject_id}\t"
-                   f"{aln.identity:.2f}\t{aln.evalue:.2e}\t{aln.bit_score:.2f}\n")
-    
-    # Update filtered hits to use only those that passed SSEARCH
-    # AND update their scores with SSEARCH scores
     ssearch_hit_keys = set(filtered_ssearch.keys())
     filtered_hits_after_ssearch = []
-    
-    for hit in filtered_hits:
-        hit_key = f"{hit.qseqid}_{hit.sseqid}_{hit.sstart}_{hit.send}"
-        if hit_key in ssearch_hit_keys:
-            # Update BlastHit with SSEARCH scores
-            ssearch_aln = filtered_ssearch[hit_key]
-            
-            # Update scores (critical for score density calculation)
-            hit.score = int(ssearch_aln.bit_score)  # Use SSEARCH bit score as raw score
-            hit.bitscore = ssearch_aln.bit_score
-            hit.evalue = ssearch_aln.evalue
-            
-            # Update alignment details
-            hit.length = ssearch_aln.alignment_length
-            hit.pident = ssearch_aln.identity
-            hit.mismatch = ssearch_aln.mismatches
-            hit.gapopen = ssearch_aln.gap_opens
-            
-            filtered_hits_after_ssearch.append(hit)
-    
+
+    # Update filtered hits to use only those that passed SSEARCH
+    # AND update their scores with SSEARCH scores
+    filtered_hits_after_ssearch_output = ssearch_dir / "filtered_hits_after_ssearch.tsv"
+    filtered_hits_after_ssearch = filter_hits_after_ssearch(filtered_hits, filtered_ssearch, ssearch_hit_keys, filtered_hits_after_ssearch_output)
     if not filtered_hits_after_ssearch:
         logger.error("No hits passed SSEARCH filtering")
         return
@@ -347,48 +324,42 @@ def run_pipeline(
         genome_id=genome_id
     )
     
+    
     merged_output = merge_dir / "merged_regions.tsv"
     save_merged_regions(merged_regions, merged_output)
     
+
     # Score density calculation (silent)
+    annotations_output = final_dir / "region_annotations.jsonl"
     region_annotations = annotate_regions_with_best_proteins(
         merged_regions,
-        filtered_hits
+        filtered_hits,
+        annotations_output
     )
-    
-    annotations_output = final_dir / "region_annotations.tsv"
-    save_region_annotations(region_annotations, annotations_output)
-    
+
     # STEP 3: Pseudogene detection
     logger.info(f"[3/3] Analyzing {len(region_annotations)} regions for pseudogenes...")
     
+    initial_annotations_path = final_dir / "initial_pseudogene_annotations.jsonl"
     pseudogene_annotations = annotate_pseudogenes(
         region_annotations,
         genome_fasta,
+        initial_annotations_path,
         min_disablements
     )
     
     # --- Coverage Filter ---
     if min_coverage > 0:
         logger.info(f"Applying coverage filter: >= {min_coverage*100:.1f}%")
+
         original_count = len(pseudogene_annotations)
-        
-        filtered_annotations = []
-        for ann in pseudogene_annotations:
-            hsps = ann.region_annotation.best_protein.hsps
-            if hsps:
-                min_qstart = min(hsp.qstart for hsp in hsps)
-                max_qend = max(hsp.qend for hsp in hsps)
-                coverage_len = max_qend - min_qstart + 1
-                ref_len = hsps[0].qlen
-                coverage_ratio = coverage_len / ref_len if ref_len > 0 else 0
-                
-                if coverage_ratio >= min_coverage:
-                    filtered_annotations.append(ann)
+        annotations_with_coverage_path = final_dir / "pseudogene_annotations_with_coverage.jsonl"
+        filtered_annotations = apply_coverage(pseudogene_annotations, min_coverage, annotations_with_coverage_path)
         
         pseudogene_annotations = filtered_annotations
         logger.info(f"  Filtered {original_count - len(pseudogene_annotations)} regions. Remaining: {len(pseudogene_annotations)}")
 
+    
     # --- Final Identity Filter ---
     if final_min_identity > 0:
         # Convert fraction to percentage if necessary (e.g. 0.7 -> 70.0)
@@ -397,36 +368,37 @@ def run_pipeline(
         
         logger.info(f"Applying final identity filter: >= {threshold_pct:.1f}%")
         original_count = len(pseudogene_annotations)
-        
-        pseudogene_annotations = [
-            ann for ann in pseudogene_annotations 
-            if max(hsp.pident for hsp in ann.region_annotation.best_protein.hsps) >= threshold_pct
-        ]
+
+        annotations_with_final_identity_path = final_dir / "pseudogene_annotations_with_final_identity.jsonl"
+        filtered_annotations = apply_final_identity(pseudogene_annotations, final_min_identity, annotations_with_final_identity_path)
+        pseudogene_annotations = filtered_annotations
         
         logger.info(f"  Filtered {original_count - len(pseudogene_annotations)} regions. Remaining: {len(pseudogene_annotations)}")
     
-    pseudogenes_output = final_dir / "pseudogene_annotations.tsv"
+
+    pseudogenes_output = final_dir / "pseudogene_annotations_final.tsv"
+    logger.info(f"Saving {len(pseudogene_annotations)} pseudogene annotations to: {pseudogenes_output}")
     save_pseudogene_annotations(pseudogene_annotations, pseudogenes_output)
+    logger.info("Pseudogene annotations saved successfully")
+    
     
     # Export GFF3
     gff3_output = final_dir / "lysozyme_annotations.gff3"
     export_to_gff3(pseudogene_annotations, genome_id, gff3_output)
     
+    
     # Save coverage statistics for detailed analysis
     coverage_output = final_dir / "coverage_statistics.tsv"
     save_coverage_statistics(pseudogene_annotations, coverage_output)
     
-    # Generate summary report
-    summary = generate_summary_report(pseudogene_annotations, min_coverage)
-    print(summary)
     
+    # Generate summary report
     report_file = final_dir / "summary_report.txt"
-    with open(report_file, 'w') as f:
-        f.write(summary)
+    summary = generate_summary_report(pseudogene_annotations, report_file, min_coverage=min_coverage)
+    print(summary)
     
     num_pseudogenes = sum(1 for ann in pseudogene_annotations if ann.is_pseudogene)
     logger.info(f"Complete: {len(pseudogene_annotations)} regions, {num_pseudogenes} pseudogenes")
-
 
 def main():
     """Função principal do pipeline."""
@@ -442,14 +414,13 @@ def main():
     try:
         # Verifica dependências
         deps = verify_and_install_dependencies()
-        
         # Decide modo de execução: single genome vs. batch
         if args.input_dir:
             # ========== MODO LOTE ==========
             logger.info("Mode: BATCH (multiple genomes)")
             
             from src.batch_processor import BatchProcessor
-            
+
             processor = BatchProcessor(
                 input_dir=args.input_dir,
                 lysozymes_path=args.lysozymes,
@@ -466,17 +437,15 @@ def main():
             start_time = datetime.now()
             processor.run_batch()
             end_time = datetime.now()
-            
         else:
             # ========== MODO SINGLE GENOME ==========
             logger.info("Mode: SINGLE GENOME")
-            
             # Valida entradas
             validate_inputs(args.genome, args.lysozymes)
             
             # Extrai genome_id do nome do arquivo
             genome_id = args.genome.stem
-            
+
             # Executa pipeline
             start_time = datetime.now()
             
@@ -493,22 +462,20 @@ def main():
                 num_threads=args.num_threads,
                 deps=deps  # Pass deps to avoid re-verification
             )
-            
             end_time = datetime.now()
         
         elapsed = end_time - start_time
         
         logger.debug(f"Total execution time: {elapsed}")
         logger.debug("Pipeline completed successfully!")
-        
-    except Exception as e:
-        logger.error(f"Erro durante execução do pipeline: {e}", exc_info=True)
-        sys.exit(1)
-        
-    except Exception as e:
-        logger.error(f"Erro durante execução do pipeline: {e}", exc_info=True)
-        sys.exit(1)
 
+    except Exception as e:
+        logger.error(f"Erro durante execução do pipeline: {e}", exc_info=True)
+        sys.exit(1)
+        
+    except Exception as e:
+        logger.error(f"Erro durante execução do pipeline: {e}", exc_info=True)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
