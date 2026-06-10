@@ -5,7 +5,9 @@ channels:
   - defaults
 
 dependencies:
+  - biopython
   - python=3.10
+  - pandas
   - blast
   - bedtools
   - fasta3

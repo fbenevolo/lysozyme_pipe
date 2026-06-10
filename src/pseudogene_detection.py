@@ -5,7 +5,6 @@ Implementa a etapa 6 do pipeline: Detecção de Mutação e Pseudogenes.
 
 import json
 import logging
-from bedtools_merge import GenomicRegion
 import pandas as pd
 from typing import List, Set, Dict, Optional
 from dataclasses import dataclass
@@ -23,6 +22,7 @@ from src.config import (
     MIN_REGION_SIZE_NT,
     MIN_ALIGNMENT_SIZE_AA
 )
+from src.bedtools_merge import GenomicRegion
 from src.blast_filter import BlastHit
 from src.score_density import RegionAnnotation, ProteinHitGroup
 
