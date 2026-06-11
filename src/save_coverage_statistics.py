@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 from typing import List
-from pseudogene_detection import PseudogeneAnnotation, calculate_subject_coverage_nt
+from src.pseudogene_detection import PseudogeneAnnotation, calculate_subject_coverage_nt
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +97,7 @@ def save_coverage_statistics(
 
 
 import sys
-from apply_coverage_filter import load_pseudogene_annotations_from_json
+from src.apply_coverage_filter import load_pseudogene_annotations_from_json
 if __name__ == "__main__":
     pseudogene_annotations = load_pseudogene_annotations_from_json(Path(sys.argv[1]))
     save_coverage_statistics(pseudogene_annotations, Path(sys.argv[2]))

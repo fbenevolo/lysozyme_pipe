@@ -12,15 +12,14 @@ from datetime import datetime
 
 from src.blast_search import run_blast_pipeline_step
 from src.blast_filter import run_filtering_step, parse_blast_output
+from src.dependencies import verify_and_install_dependencies
 from src.ssearch_realign import realign_filtered_hits_parallel
 from src.bedtools_merge import merge_blast_hits
 from src.score_density import annotate_regions_with_best_proteins
-from src.pseudogene_detection import (
-    annotate_pseudogenes, 
-    save_coverage_statistics,
-    generate_summary_report
-)
-from save_pseudogene_annotations import save_pseudogene_annotations
+from src.pseudogene_detection import annotate_pseudogenes
+from src.save_coverage_statistics import save_coverage_statistics
+from src.generate_summary_report import generate_summary_report
+from src.save_pseudogene_annotations import save_pseudogene_annotations
 from src.export_gff3 import export_to_gff3
 from src.comparative_analysis import generate_comparative_report
 from src.config import (
@@ -193,7 +192,7 @@ class BatchProcessor:
             
             # Filter by E-value
             evalue_threshold = 1e-7
-            filtered_ssearch = {key: aln for key, aln in ssearch_alignments.items() 
+            filtered_ssearch = {key: aln for key, aln in ssearch_alignments.items()
                                if aln.evalue <= evalue_threshold}
             
             logger.debug(f"  SSEARCH realignments (E-value ≤ {evalue_threshold:.0e}): {len(filtered_ssearch)}")
@@ -251,10 +250,12 @@ class BatchProcessor:
             logger.debug(f"  Annotated regions: {len(region_annotations)}")
             
             # STEP 6: PSEUDOGENE DETECTION
+            initial_annotations_path = final_dir / "initial_pseudogene_annotations.jsonl"
             logger.debug(f"[{genome_id}] STEP 6: Pseudogene Detection")
             pseudogene_annotations = annotate_pseudogenes(
                 region_annotations,
                 genome_path,
+                initial_annotations_path,
                 self.min_disablements
             )
             
@@ -307,10 +308,10 @@ class BatchProcessor:
             save_coverage_statistics(pseudogene_annotations, coverage_stats_output)
 
             # Generate and save summary report
-            summary_report = generate_summary_report(pseudogene_annotations, self.min_coverage)
             summary_output = final_dir / "lysozyme_summary.txt"
-            with open(summary_output, 'w') as f:
-                f.write(summary_report)
+            summary_report = generate_summary_report(pseudogene_annotations, summary_output, self.min_coverage)
+            # with open(summary_output, 'w') as f:
+            #     f.write(summary_report)
             
             # Export GFF3
             gff3_output = final_dir / f"{genome_id}_annotations.gff3"
@@ -405,3 +406,21 @@ class BatchProcessor:
         logger.debug(f"Results saved in: {self.output_dir}")
         
         return aggregated_df
+
+
+import sys
+if __name__ == "__main__":
+    deps = verify_and_install_dependencies()
+    processor = BatchProcessor(
+        input_dir=Path(sys.argv[1]),
+        lysozymes_path=Path(sys.argv[2]),
+        output_dir=Path(sys.argv[3]),
+        dependencies=deps,
+        min_identity=float(sys.argv[4]),
+        min_score=float(sys.argv[5]),
+        min_disablements=float(sys.argv[6]),
+        min_coverage=float(sys.argv[7]),
+        final_min_identity=float(sys.argv[8]),
+        num_threads=int(sys.argv[4])
+    )
+    processor.run_batch()

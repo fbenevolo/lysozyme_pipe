@@ -2,7 +2,7 @@ import json
 import pandas as pd
 from pathlib import Path
 from typing import List
-from pseudogene_detection import PseudogeneAnnotation
+from src.pseudogene_detection import PseudogeneAnnotation
 
 
 def save_pseudogene_annotations(

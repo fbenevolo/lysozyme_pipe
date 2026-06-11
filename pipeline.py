@@ -25,12 +25,12 @@ from src.ssearch_realign import realign_filtered_hits
 from src.bedtools_merge import merge_blast_hits
 from src.score_density import annotate_regions_with_best_proteins
 from src.pseudogene_detection import annotate_pseudogenes
-from save_coverage_statistics import save_coverage_statistics
-from save_pseudogene_annotations import save_pseudogene_annotations
-from apply_coverage_filter import apply_coverage
-from apply_final_identity_filter import apply_final_identity
+from src.save_coverage_statistics import save_coverage_statistics
+from src.save_pseudogene_annotations import save_pseudogene_annotations
+from src.apply_coverage_filter import apply_coverage
+from src.apply_final_identity_filter import apply_final_identity
 from src.export_gff3 import export_to_gff3
-from generate_summary_report import generate_summary_report
+from src.generate_summary_report import generate_summary_report
 from src.filter_ssearch import filter_ssearch_by_evalue
 from src.filter_hits_after_ssearch import filter_hits_after_ssearch
 from src.bedtools_save_merged_regions import save_merged_regions

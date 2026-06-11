@@ -13,12 +13,30 @@ include { SavePseudogeneAnnotations } from "../modules/local/save_pseudogene_ann
 include { ExportToGFF3 } from "../modules/local/export_to_gff3.nf";
 include { SaveCoverageStatistics } from "../modules/local/save_coverage_statistics.nf";
 include { GenerateSummaryReport } from "../modules/local/generate_summary_report.nf";
+include { BatchProcessor } from "../modules/local/batch_processor.nf";
 
 workflow {
     main:
 
+    if (params.input_dir) {
+        BatchProcessor(
+            params.input_dir,
+            params.lysozyme_fasta,
+            params.output_dir,
+            params.min_identity,
+            params.min_score,
+            params.min_disablements,
+            params.min_coverage,
+            params.final_min_identity,
+            params.num_threads
+        )
+        return;
+    }
+
+
     def genome_id = file(params.genome_fasta).baseName;
 
+    
     blast_out = RunBlastPipeline(
         file(params.genome_fasta), 
         file(params.lysozyme_fasta)
@@ -103,7 +121,7 @@ workflow {
         params.final_min_identity
     )
 
-    pseudogene_annotation_final = (params.final_min_identity) ? pseudogene_annotation_with_final_identity : pseudogene_annotation_parcial
+    pseudogene_annotation_final = (params.final_min_identity > 0) ? pseudogene_annotation_with_final_identity : pseudogene_annotation_parcial
 
     SavePseudogeneAnnotations(pseudogene_annotation_final)
     ExportToGFF3(pseudogene_annotation_final, genome_id)

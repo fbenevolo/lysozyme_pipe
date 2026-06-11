@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List
-from blast_filter import BlastHit
-from ssearch_realign import SSearchAlignment
+from src.blast_filter import BlastHit
+from src.ssearch_realign import SSearchAlignment
 
 from src.ssearch_realign import load_blast_hits_from_tsv # convert TSV to List[BlastHit]
 from src.filter_ssearch import load_alignments_from_tsv # convert TSV to Dict[str, SSearchAlignment]

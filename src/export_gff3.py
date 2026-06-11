@@ -174,7 +174,7 @@ def export_batch_to_gff3(
 
 
 import sys
-from save_pseudogene_annotations import load_pseudogene_annotations_from_json
+from src.save_pseudogene_annotations import load_pseudogene_annotations_from_json
 if __name__ == "__main__":
     pseudogene_annotations = load_pseudogene_annotations_from_json(Path(sys.argv[1]))
     export_to_gff3(pseudogene_annotations, sys.argv[2], Path(sys.argv[3]))

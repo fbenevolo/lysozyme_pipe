@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List
 
-from pseudogene_detection import PseudogeneAnnotation
+from src.pseudogene_detection import PseudogeneAnnotation
 
 
 def generate_summary_report(annotations: List[PseudogeneAnnotation], output_path: Path, min_coverage: float = 0.8) -> str:
@@ -158,7 +158,7 @@ REFERENCE PROTEIN COVERAGE ANALYSIS:
 
 
 import sys
-from apply_coverage_filter import load_pseudogene_annotations_from_json
+from src.apply_coverage_filter import load_pseudogene_annotations_from_json
 if __name__ == "__main__":
     pseudogene_annotations = load_pseudogene_annotations_from_json(Path(sys.argv[1]))
     generate_summary_report(pseudogene_annotations, Path(sys.argv[2]), float(sys.argv[3]))

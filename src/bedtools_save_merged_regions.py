@@ -2,7 +2,7 @@ import logging
 import pandas as pd
 from pathlib import Path
 from typing import List
-from bedtools_merge import GenomicRegion, parse_merged_bed
+from src.bedtools_merge import GenomicRegion, parse_merged_bed
 
 logger = logging.getLogger(__name__)
 

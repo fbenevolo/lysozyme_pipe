@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from typing import List
-from pseudogene_detection import PseudogeneAnnotation
+from src.pseudogene_detection import PseudogeneAnnotation
 
 def apply_coverage(pseudogene_annotations: List[PseudogeneAnnotation], min_coverage: float, output_path: Path) -> List[PseudogeneAnnotation]:
     filtered_annotations = []

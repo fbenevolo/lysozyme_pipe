@@ -1,7 +1,7 @@
 import logging
-from ssearch_realign import SSearchAlignment
 from pathlib import Path
 from typing import Dict
+from src.ssearch_realign import SSearchAlignment
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from typing import List
-from pseudogene_detection import PseudogeneAnnotation
+from src.pseudogene_detection import PseudogeneAnnotation
 
 
 def apply_final_identity(pseudogene_annotations: List[PseudogeneAnnotation], final_min_identity: float,
@@ -21,7 +21,7 @@ def apply_final_identity(pseudogene_annotations: List[PseudogeneAnnotation], fin
     return filtered_annotations
 
 import sys
-from apply_coverage_filter import load_pseudogene_annotations_from_json
+from src.apply_coverage_filter import load_pseudogene_annotations_from_json
 if __name__ == "__main__":
     pseudogene_annotation = load_pseudogene_annotations_from_json(Path(sys.argv[1]))
     apply_final_identity(pseudogene_annotation, float(sys.argv[2]), Path(sys.argv[3]))

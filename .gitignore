@@ -25,6 +25,7 @@ ENV/
 output/
 results/
 batch_results/
+batch_output/
 downloaded_genomes/
 test_download/
 
