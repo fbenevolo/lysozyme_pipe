@@ -3,7 +3,8 @@
 Script to download genome sequences from NCBI based on BVBRC metadata CSV.
 Downloads FASTA files and creates a metadata file for downstream analysis.
 """
-
+import urllib.request
+import urllib.error
 import pandas as pd
 import sys
 import subprocess
@@ -68,31 +69,45 @@ def extract_accession_numbers(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def download_genome_efetch(accession: str, output_path: Path) -> Optional[Path]:
-    """Download genome using NCBI efetch."""
+    """Download genome using NCBI E-utilities REST API directly via Python."""
+    
+    # The NCBI E-utilities endpoint for fetching sequences
+    url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id={accession}&rettype=fasta&retmode=text"
+    
     try:
-        cmd = f"efetch -db nuccore -id {accession} -format fasta"
-        result = subprocess.run(
-            cmd, 
-            shell=True, 
-            capture_output=True, 
-            text=True, 
-            timeout=300
-        )
+        # NCBI requires a User-Agent, and identifying your script is good practice
+        headers = {'User-Agent': 'Python-urllib/3.x (BVBRC_Downloader)'}
+        req = urllib.request.Request(url, headers=headers)
         
-        if result.returncode == 0 and result.stdout:
-            with open(output_path, 'w') as f:
-                f.write(result.stdout)
-            logger.info(f"  ✓ Downloaded: {output_path.name}")
-            return output_path
-        else:
-            logger.error(f"  efetch failed for {accession}")
-            return None
+        with urllib.request.urlopen(req, timeout=300) as response:
+            fasta_data = response.read().decode('utf-8')
             
+            # Check if NCBI returned an empty response or an error string
+            if not fasta_data.strip():
+                logger.error(f"  Empty response from NCBI for {accession}")
+                return None
+            if "Error" in fasta_data[:100]: # Sometimes NCBI returns 200 OK but includes an error in text
+                logger.error(f"  NCBI Error for {accession}: {fasta_data[:100].strip()}...")
+                return None
+                
+            # Write out the FASTA file
+            with open(output_path, 'w') as f:
+                f.write(fasta_data)
+                
+        logger.info(f"  ✓ Downloaded: {output_path.name}")
+        return output_path
+        
+    except urllib.error.HTTPError as e:
+        logger.error(f"  HTTP Error for {accession}: {e.code} - {e.reason}")
+        return None
+    except urllib.error.URLError as e:
+        logger.error(f"  Network/URL Error for {accession}: {e.reason}")
+        return None
     except Exception as e:
-        logger.error(f"  efetch error for {accession}: {e}")
+        logger.error(f"  Download error for {accession}: {e}")
         return None
 
-
+ 
 def download_genome_ncbi(accession: str, output_dir: Path, genome_id: str) -> Optional[Path]:
     """Download genome FASTA from NCBI."""
     output_dir.mkdir(parents=True, exist_ok=True)
